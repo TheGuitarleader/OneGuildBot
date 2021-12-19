@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "discord.js": "^13.3.1",
+    "sqlite3": "^4.2.0"
+  },
+  "name": "onesiebot",
+  "version": "1.0.0",
+  "description": "a discord bot",
+  "main": "app.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Kyle (TheGuitarleader)",
+  "license": "ISC"
+}
