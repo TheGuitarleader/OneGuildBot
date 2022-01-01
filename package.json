@@ -1,13 +1,16 @@
 {
   "dependencies": {
+    "date-events": "^1.0.1",
     "discord.js": "^13.3.1",
+    "kailogs": "^2.1.1",
+    "moment": "^2.29.1",
+    "request": "^2.88.2",
     "sqlite3": "^4.2.0"
   },
   "name": "onesiebot",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "a discord bot",
   "main": "app.js",
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
