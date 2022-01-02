@@ -1,14 +1,21 @@
 const fs = require('fs');
 const Discord = require('discord.js');
 const Client = require('./client/client.js');
+const Twit = require('twit');
 const config = require('./config.json');
 const package = require('./package.json');
 const logger = require('kailogs');
 const clock = require('date-events')();
 const moment = require('moment');
 
-const client = new Client();
-client.commands = new Discord.Collection();
+// Events
+const OnMemberJoin = require('./events/OnMemberJoin');
+const OnMemberLeave = require('./events/OnMemberLeave');
+const OnTweet = require('./events/OnNewTweet');
+const OnNewTweet = require('./events/OnNewTweet');
+
+const discordClient = new Client();
+discordClient.commands = new Discord.Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
 const sqlite = require('sqlite3').verbose();
@@ -16,25 +23,14 @@ let db = new sqlite.Database('./data.db');
 
 for(const file of commandFiles) {
     const command = require(`./commands/${file}`);
-    client.commands.set(command.name, command);
+    discordClient.commands.set(command.name, command);
 }
 
-console.log(client.commands);
+console.log(discordClient.commands);
 
 logger.loadLog('./logs');
 logger.log(`${package.name} v${package.version}`, 'main');
-client.login(config.discord.token);
-
-client.once('disconnect', () => {
-	logger.warn('Disconnected from Discord', 'main');
-});
-
-client.once('ready', () => {
-    logger.log('Online and connected to Discord', 'main');
-    client.guilds.fetch(config.discord.guildID).then((g) => {
-        g.commands.set(client.commands)
-    });
-});
+discordClient.login(config.discord.token);
 
 // Saves the log at 11:59pm
 clock.on('23:59', function (date) {
@@ -42,40 +38,26 @@ clock.on('23:59', function (date) {
     logger.createLog('./logs');
 });
 
-// client.guilds.fetch(config.discord.guild).then((guild) => {
-//     guild.commands.set(client.commands).then(() => {
-//         logger.log("Deployed guild commands");
-//     });
-// }).catch(logger.error);
+discordClient.once('disconnect', () => {
+	logger.warn('Disconnected from Discord', 'discord');
+});
 
-// setInterval(function() {
-//     console.log("Updating Players");
-//     client.guilds.fetch(config.discord.guild).then((guild) => {updatePlayers(guild, client)}).catch(logger.error);
-// }, 120000);
+discordClient.once('ready', () => {
+    logger.log('Online and connected to Discord', 'discord');
+    discordClient.user.setPresence({ activities: [{ name: `Beta v${package.version}` }], status: 'online' });
+    discordClient.guilds.fetch(config.discord.guildID).then((g) => {
+        g.commands.set(discordClient.commands);
+        logger.log(`Updated slash commands for guild: '${g.name}' (${g.id})`, 'discord');
+    });
+});
 
-setInterval(function() {
-    updateStatus(client);
-}, 35 * 60000);
 
-// Handle commands
-client.on('messageCreate', async message => {
+// Handle messages
+discordClient.on('messageCreate', async message => {
     if(message.author.bot) return;
     if(!message.content.startsWith(config.discord.botPrefix)) return;
 
     console.log(message.author.id);
-    //console.log(client.application.owner.id);
-
-    if (message.content === '!deploy' && message.author.id === config.discord.devID && message.author.id === config.discord.ownerID) {
-        await message.guild.commands
-          .set(client.commands)
-          .then(() => {
-            message.reply('Deployed!');
-          })
-          .catch(err => {
-            message.reply('Could not deploy commands! Make sure the bot has the application.commands permission!');
-            console.error(err);
-          });
-    }
     
     // try {
     //     const args = message.content.slice(config.discord.botPrefix.length).split(/ +/);
@@ -90,20 +72,19 @@ client.on('messageCreate', async message => {
     // }
 });
 
-//
-// Handle Interactions
-//
-client.on('interactionCreate', async interaction => {
-    logger.log(`Received interaction: '${interaction.id}' from '${interaction.member.displayName}'`, 'main');
-    const command = client.commands.get(interaction.commandName.toLowerCase());
+
+// Handle interactions
+discordClient.on('interactionCreate', async interaction => {
+    logger.log(`Received interaction: '${interaction.id}' from '${interaction.member.displayName}'`, 'discord');
+    const command = discordClient.commands.get(interaction.commandName.toLowerCase());
 
     try {
-        command.execute(interaction, client); 
-        logger.log(`Ran command: '${command.name}' from '${interaction.member.displayName}'`, 'main');
+        command.execute(interaction, discordClient); 
+        logger.log(`Ran command: '${command.name}' from '${interaction.member.displayName}'`, 'discord');
         
     } catch(err) {
-        logger.warn(`Unknown command: '${interaction.id}' from '${message.author.username}' (${interaction.guild.name})`, 'main');
-        logger.error(err, 'main');
+        logger.warn(`Unknown command: '${interaction.id}' from '${message.author.username}' (${interaction.guild.name})`, 'discord');
+        logger.error(err, 'discord');
         interaction.followUp({
             content: ':x: `' + err + '`',
             ephemeral: true
@@ -112,71 +93,61 @@ client.on('interactionCreate', async interaction => {
 });
 
 
-//
 // New member joins
-//
-client.on('guildMemberAdd', member => {
-    logger.log(`User '${member.displayName}' (${member.id}) joined server '${member.guild.name}' (${member.guild.id})`, 'event');
-
-    var createdDate = new Date(member.user.createdAt);
-    console.log(createdDate);
-
-    const embed = new Discord.MessageEmbed()
-    .setColor('1f8b4c')
-    .setAuthor(`${member.user.username}#${member.user.discriminator} joined the guild`)
-    .addField('Total Users:', member.guild.memberCount.toString(), true)
-    .addField('Account created:', `${createdDate.toString().split(" ").slice(0, 4).join(" ")} (${getActiveDays(member.user.createdAt) -1} days old)`, true)
-    .setFooter("ID: " + member.user.id)
-    client.channels.cache.get(config.discord.logging).send({ embeds: [embed] });
+discordClient.on('guildMemberAdd', member => {
+    OnMemberJoin(member, discordClient);
 });
 
 
-//
 // Member leaves
-//
-client.on('guildMemberRemove', member => {
-    logger.log(`User '${member.displayName}' (${member.id}) left server '${member.guild.name}' (${member.guild.id})`)
-
-    var createdDate = new Date(member.joinedAt);
-    console.log(createdDate);
-
-    const embed = new Discord.MessageEmbed()
-    .setColor('E74C3C')
-    .setAuthor(`${member.user.username}#${member.user.discriminator} left the guild`)
-    .addField('Total Users:', member.guild.memberCount.toString(), true)
-    .addField('Member since:', `${createdDate.toString().split(" ").slice(0, 4).join(" ")} (${getActiveDays(member.joinedAt) -1} days old)`, true)
-    .setFooter("ID: " + member.user.id)
-    client.channels.cache.get(config.discord.logging).send({ embeds: [embed] });
-
-    db.run(`DELETE FROM accounts WHERE discordID = "${member.id}"`, (err) => {
-        if(err){
-            logger.error(err, 'database');
-        }
-        else
-        {
-            logger.log(`Removed account '${member.user.username}'`, 'database');
-        }
-    });
+discordClient.on('guildMemberRemove', member => {
+    OnMemberLeave(member, discordClient);
 });
 
 
 //
-// Functions
+// Twitter API
+// -------------------------------------------------------------
 //
-function getActiveMinutes(date) {
-    var createdDate = new Date(date);
-    console.log(createdDate);
-    var currentDate = new Date(Date.now());
-    var diffMin = Math.ceil(Math.abs(currentDate - createdDate) / (1000 * 60));
-    console.log(diffMin);
-    return diffMin;
-}
+var Twitter = new Twit({
+    consumer_key: config.twitter.consumer_key,
+    consumer_secret: config.twitter.consumer_secret,
+    access_token: config.twitter.access_token,
+    access_token_secret: config.twitter.access_token_secret
+});
 
-function getActiveDays(date) {
-    var createdDate = new Date(date);
-    console.log(createdDate);
-    var currentDate = new Date(Date.now());
-    var diffDays = Math.ceil(Math.abs(currentDate - createdDate) / (1000 * 60 * 60 * 24));
-    console.log(diffDays);
-    return diffDays;
-}
+const getUsers = () => {
+    return new Promise((res, rej) => {
+        let result = [];
+        db.each(`SELECT ID FROM tweetAccounts`, (err, row) => {
+            if(err) {
+                rej(err)
+            }
+            result.push(row.ID);
+        }, () => {
+            res(result);
+        })
+    })
+};
+
+getUsers().then((users) => {
+    logger.log('Gathered users from database', 'twitter');
+    var tweetStream = Twitter.stream('statuses/filter', { follow: users });
+
+    tweetStream.on('disconnected', function(disconnect) {
+        logger.warn('Disconnected from follow tweet stream', 'twitter');
+        console.log(disconnect);
+    });
+
+    tweetStream.on('connect', function (request) {
+        logger.log('Connecting to follow tweetStream...', 'twitter');
+    });
+
+    tweetStream.on('connected', function (response) {
+        logger.log(`Connected to tweetStream with message: '${response.statusMessage}' (Code: ${response.statusCode})`, 'twitter');
+    });
+
+    tweetStream.on('tweet', function(tweet) {
+        OnNewTweet(tweet, discordClient, db, users);
+    })
+})
