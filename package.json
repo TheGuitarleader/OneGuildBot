@@ -2,14 +2,14 @@
   "dependencies": {
     "date-events": "^1.0.1",
     "discord.js": "^13.5.0",
-    "kailogs": "^2.1.1",
+    "kailogs": "^3.1.1",
     "moment": "^2.29.1",
     "request": "^2.88.2",
     "sqlite3": "^4.2.0",
     "twit": "^2.2.11"
   },
   "name": "onesiebot",
-  "version": "0.2.0",
+  "version": "0.3.4",
   "description": "a discord bot",
   "main": "app.js",
   "scripts": {

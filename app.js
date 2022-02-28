@@ -8,6 +8,10 @@ const logger = require('kailogs');
 const clock = require('date-events')();
 const moment = require('moment');
 
+// Functions
+const vip = require('./functions/vipProgress.js');
+const addToVips = require('./functions/addToVips.js');
+
 // Events
 const OnMemberJoin = require('./events/OnMemberJoin');
 const OnMemberLeave = require('./events/OnMemberLeave');
@@ -44,7 +48,7 @@ discordClient.once('disconnect', () => {
 
 discordClient.once('ready', () => {
     logger.log('Online and connected to Discord', 'discord');
-    discordClient.user.setPresence({ activities: [{ name: `Beta v${package.version}` }], status: 'online' });
+    //discordClient.user.setPresence({ activities: [{ name: `Beta v${package.version}` }], status: 'online' });
     discordClient.guilds.fetch(config.discord.guildID).then((g) => {
         g.commands.set(discordClient.commands);
         logger.log(`Updated slash commands for guild: '${g.name}' (${g.id})`, 'discord');
@@ -55,21 +59,11 @@ discordClient.once('ready', () => {
 // Handle messages
 discordClient.on('messageCreate', async message => {
     if(message.author.bot) return;
-    if(!message.content.startsWith(config.discord.botPrefix)) return;
+    if(message.content.startsWith(config.discord.botPrefix)) return;
 
-    console.log(message.author.id);
-    
-    // try {
-    //     const args = message.content.slice(config.discord.botPrefix.length).split(/ +/);
-    //     const commandName = args.shift().toLowerCase();
-    //     const command = client.commands.get(commandName);
-    //     command.execute(message, client); 
-    //     logger.log(`Ran command: '${config.discord.botPrefix}${commandName}' from '${message.author.username}'`, 'main');
-        
-    // } catch(err) {
-    //     logger.warn(`Unknown command: '${message.content}' from '${message.author.username}' (${message.guild.name})`, 'main');
-    //     logger.error(err, 'main');
-    // }
+    if(message.guild.id == config.discord.guildID) {
+        vip(message, 1);
+    }
 });
 
 
@@ -92,6 +86,15 @@ discordClient.on('interactionCreate', async interaction => {
     }
 });
 
+// Member Update
+discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+        discordClient.channels.fetch(config.discord.channelID).then((channel) => {
+            addToVips(newMember, channel, 90);
+        });
+    }
+});
+
 
 // New member joins
 discordClient.on('guildMemberAdd', member => {
@@ -103,6 +106,58 @@ discordClient.on('guildMemberAdd', member => {
 discordClient.on('guildMemberRemove', member => {
     OnMemberLeave(member, discordClient);
 });
+
+// Date Events
+clock.on('*-*-* 00:00', function (rawDate) {
+    var date = FormatDate(rawDate);
+
+    logger.log(`Checking VIPs for today`)
+    discordClient.guilds.fetch(config.discord.guildID).then((guild) => {
+        db.all(`SELECT * FROM vips WHERE expireDate = "${date}"`, (err, rows) => {
+            if(err){
+                console.log(err);
+                logger.error(err, 'app');
+            }
+            else
+            {
+                rows.forEach((row) => {
+                    guild.members.fetch(row.discordID).then((member) => {
+                        member.roles.remove(member.guild.roles.cache.find(r => r.name === "VIP"));
+
+                        db.serialize(() => {
+                            db.run(`DELETE FROM vips WHERE expireDate = "${date}"`, function(err) {
+                                if(err) {
+                                    logger.error(err, 'app');
+                                }
+                                else {
+                                    logger.log(`Removed VIP '${member.displayName}' (${member.user.id})`, 'app')
+                                }
+                            });
+
+                            db.run(`UPDATE users SET vipProgress = 0, isVIP = "false" WHERE discordID = "${member.user.id}"`, function(err) {
+                                if(err) {
+                                    logger.error(err, "vipProgress");
+                                }
+                                else {
+                                    logger.log(`Reset '${member.displayName}' (${member.user.id}) VIP progress`, 'app')
+                                }
+                            });
+                        })
+                    });
+                });
+            }
+        });
+    });
+});
+
+function FormatDate(date)
+{
+    var d = new Date(date);
+    var month = d.getMonth() + 1;
+    var day = d.getDate();
+    var year = d.getFullYear();
+    return year + '-' + month + '-' + day;
+}
 
 
 //

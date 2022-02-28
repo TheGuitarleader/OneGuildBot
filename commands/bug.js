@@ -9,7 +9,7 @@ module.exports = {
     description: "Links to the bug tracker.",
     async execute(interaction, client) {
         var options = {
-            url: 'https://api.github.com/repos/TheGuitarleader/OnesieBot/issues?state=all',
+            url: 'https://api.github.com/repos/TheGuitarleader/OneGuildBot/issues?state=all',
             headers: {
               'User-Agent': 'theguitarleader'
             }
@@ -49,7 +49,7 @@ module.exports = {
 
                 const embed = new Discord.MessageEmbed()
                 .setColor(config.discord.embed_hex)
-                .setTitle(`OnesieBot Bug Tracker`)
+                .setTitle(`One Guild Bug Tracker`)
                 .setThumbnail(interaction.client.user.avatarURL())
                 .setDescription(`This helps us keep track of bugs and possible \nthings to add to make the bot even better!\n
                 To submit a issue or something to add:
@@ -59,7 +59,7 @@ module.exports = {
                 .addField("Features Submitted", featureRequests, false)
                 .addField("Known Bugs", activeBugs, true)
                 .addField("Bugs Fixed", fixedBugs, true)
-                .setURL("https://github.com/TheGuitarleader/OnesieBot/issues/new")
+                .setURL("https://github.com/TheGuitarleader/OneGuildBot/issues/new")
                 .setFooter("Powered By Quentin")  
                 interaction.reply({embeds: [embed] });
                 logger.log(`Showed bug tracker on guild '${message.guild.name}' (${message.guild.id})`, this.name);
