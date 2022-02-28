@@ -67,112 +67,120 @@ module.exports = {
         }
     ],
     async execute(interaction, client) {
-        var type = interaction.options.get('type').value;
-        if(type == 'add') {
-            Twitter.get('users/show', { screen_name: interaction.options.get('twitter_name').value },  function (err, data, response) {
-                if(err) {
-                    interaction.reply({
-                        content: ":x: **Could not find a account called** `" + interaction.options.get('twitter_name').value + "`",
-                        ephemeral: true
-                    });
-                } 
-                else {
-                    db.serialize(() => {
-                        db.run(`INSERT OR IGNORE INTO tweetAccounts VALUES("${data.id_str}", "${data.screen_name}")`, (err) => {
-                            if(err){
-                                logger.error(err, 'twitter');
-                            }
-                        });
-    
-                        console.log(interaction.options.get('show_replies'));
-                        db.run(`INSERT INTO tweetProfiles VALUES("${interaction.options.getUser('user').id}", "${interaction.options.getChannel('channel').id}", "${data.id_str}", "${data.screen_name}", "${defaultBool(interaction.options.get('show_replies'))}", "${defaultBool(interaction.options.get('show_retweets'))}")`, (err) => {
-                            if(err){
-                                logger.warn(err, 'twitter');
-                                interaction.reply({
-                                    content: ':x: `' + data.screen_name + '`** is already being followed!** ```' + err + '```',
-                                    ephemeral: true
-                                });
-                            }
-                            else
-                            {
-                                logger.log(`Followed new account '${data.screen_name}' (${data.id_str})`, 'twitter');
-
-                                const embed = new Discord.MessageEmbed()
-                                .setColor(data.profile_link_color)
-                                .setAuthor({ name: `${data.name} (@${data.screen_name})`, iconURL: data.profile_image_url, url: `https://twitter.com/${data.screen_name}` })
-                                .setDescription(data.description)
-                                .addField("Following", formatCommas(data.friends_count), true)
-                                .addField("Followers", formatCommas(data.followers_count), true)
-                                .setFooter({ text: 'Powered By Tweeter' })
-  
-                                interaction.reply({
-                                    content: ':white_check_mark: **Successfully started following `' + data.screen_name + '`.**  *Please allow up to a hour to start receiving tweets!*',
-                                    embeds: [ embed ],
-                                    ephemeral: true
-                                });
-                            }
-                        });
-                    })
-                }
-            });
-        }
-        else if(type == 'update') {
-            db.run(`UPDATE tweetProfiles SET channelID = "${interaction.options.getChannel('channel').id}", showReplies = "${defaultBool(interaction.options.get('show_replies'))}", showRetweets = "${defaultBool(interaction.options.get('show_retweets'))}" WHERE discordID = "${interaction.options.getUser('user').id}"`, (err) => {
-                if(err){
-                    logger.warn(err, 'twitter');
-                    interaction.reply({
-                        content: '```' + err + '```',
-                        ephemeral: true
-                    });
-                }
-                else
-                {
-                    logger.log(`Updated ${interaction.options.getUser('user').username}'s profile (${interaction.options.getUser('user').id})`, 'twitter');
-                    interaction.reply({
-                        content: ':white_check_mark: **Successfully updated profile.**',
-                        ephemeral: true
-                    });
-                }
-            });
-        }
-        else if(type == 'remove') {
-            db.serialize(() => {
-                db.all(`SELECT * FROM tweetProfiles WHERE discordID = "${interaction.options.getUser('user').id}"`, (err, row) => {
+        if(config.discord.ownerIDs.includes(interaction.member.id)) {
+            var type = interaction.options.get('type').value;
+            if(type == 'add') {
+                Twitter.get('users/show', { screen_name: interaction.options.get('twitter_name').value },  function (err, data, response) {
                     if(err) {
-                        console.log(err);
-                    }
-                    else {
-                        db.run(`DELETE FROM tweetAccounts WHERE ID = "${row.accountID}"`, (err) => {
-                            if(err){
-                                logger.error(err, 'twitter');
-                            }
-                            else
-                            {
-                                logger.log(`Removed account '${interaction.options.getUser('user').username}' from database`, 'twitter');
-                            }
+                        interaction.reply({
+                            content: ":x: **Could not find a account called** `" + interaction.options.get('twitter_name').value + "`",
+                            ephemeral: true
                         });
+                    } 
+                    else {
+                        db.serialize(() => {
+                            db.run(`INSERT OR IGNORE INTO tweetAccounts VALUES("${data.id_str}", "${data.screen_name}")`, (err) => {
+                                if(err){
+                                    logger.error(err, 'twitter');
+                                }
+                            });
+        
+                            console.log(interaction.options.get('show_replies'));
+                            db.run(`INSERT INTO tweetProfiles VALUES("${interaction.options.getUser('user').id}", "${interaction.options.getChannel('channel').id}", "${data.id_str}", "${interaction.options.getUser('user').username}", "${data.screen_name}", "${defaultBool(interaction.options.get('show_replies'))}", "${defaultBool(interaction.options.get('show_retweets'))}")`, (err) => {
+                                if(err){
+                                    logger.warn(err, 'twitter');
+                                    interaction.reply({
+                                        content: ':x: `' + data.screen_name + '`** is already being followed!** ```' + err + '```',
+                                        ephemeral: true
+                                    });
+                                }
+                                else
+                                {
+                                    logger.log(`Followed new account '${data.screen_name}' (${data.id_str})`, 'twitter');
+    
+                                    const embed = new Discord.MessageEmbed()
+                                    .setColor(data.profile_link_color)
+                                    .setAuthor({ name: `${data.name} (@${data.screen_name})`, iconURL: data.profile_image_url, url: `https://twitter.com/${data.screen_name}` })
+                                    .setDescription(data.description)
+                                    .addField("Following", formatCommas(data.friends_count), true)
+                                    .addField("Followers", formatCommas(data.followers_count), true)
+                                    .setFooter({ text: 'Powered By Tweeter' })
+      
+                                    interaction.reply({
+                                        content: ':white_check_mark: **Successfully started following `' + data.screen_name + '`.**  *Please allow up to a hour to start receiving tweets!*',
+                                        embeds: [ embed ],
+                                        ephemeral: true
+                                    });
+                                }
+                            });
+                        })
                     }
                 });
-
-                db.run(`DELETE FROM tweetProfiles WHERE discordID = "${interaction.options.getUser('user').id}"`, (err) => {
+            }
+            else if(type == 'update') {
+                db.run(`UPDATE tweetProfiles SET channelID = "${interaction.options.getChannel('channel').id}", showReplies = "${defaultBool(interaction.options.get('show_replies'))}", showRetweets = "${defaultBool(interaction.options.get('show_retweets'))}" WHERE discordID = "${interaction.options.getUser('user').id}"`, (err) => {
                     if(err){
-                        message.channel.send(':x: **Failed to remove account!**');
-                        logger.error(err, 'twitter');
+                        logger.warn(err, 'twitter');
                         interaction.reply({
-                            content: ':x: **Failed to remove account!** ```' + err + '```',
+                            content: '```' + err + '```',
                             ephemeral: true
                         });
                     }
                     else
                     {
-                        logger.log(`Removed account '${interaction.options.getUser('user').username}' from profiles`, 'twitter');
+                        logger.log(`Updated ${interaction.options.getUser('user').username}'s profile (${interaction.options.getUser('user').id})`, 'twitter');
                         interaction.reply({
-                            content: ':white_check_mark: **Successfully unfollowed** `' + interaction.options.getUser('user').username + '`',
+                            content: ':white_check_mark: **Successfully updated profile.**',
                             ephemeral: true
                         });
                     }
                 });
-            })
+            }
+            else if(type == 'remove') {
+                db.serialize(() => {
+                    db.all(`SELECT * FROM tweetProfiles WHERE discordID = "${interaction.options.getUser('user').id}"`, (err, row) => {
+                        if(err) {
+                            console.log(err);
+                        }
+                        else {
+                            db.run(`DELETE FROM tweetAccounts WHERE ID = "${row.accountID}"`, (err) => {
+                                if(err){
+                                    logger.error(err, 'twitter');
+                                }
+                                else
+                                {
+                                    logger.log(`Removed account '${interaction.options.getUser('user').username}' from database`, 'twitter');
+                                }
+                            });
+                        }
+                    });
+    
+                    db.run(`DELETE FROM tweetProfiles WHERE discordID = "${interaction.options.getUser('user').id}"`, (err) => {
+                        if(err){
+                            message.channel.send(':x: **Failed to remove account!**');
+                            logger.error(err, 'twitter');
+                            interaction.reply({
+                                content: ':x: **Failed to remove account!** ```' + err + '```',
+                                ephemeral: true
+                            });
+                        }
+                        else
+                        {
+                            logger.log(`Removed account '${interaction.options.getUser('user').username}' from profiles`, 'twitter');
+                            interaction.reply({
+                                content: ':white_check_mark: **Successfully unfollowed** `' + interaction.options.getUser('user').username + '`',
+                                ephemeral: true
+                            });
+                        }
+                    });
+                })
+            }
+        }
+        else {
+            interaction.reply({
+                content: ":no_entry_sign: **Unauthorised**",
+                ephemeral: true
+            });
         }
     }
 }
