@@ -1,6 +1,6 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 
 const HelixAPI = require('simple-helix-api');
 const sqlite = require('sqlite3').verbose();
@@ -47,8 +47,7 @@ module.exports = {
         {
             name: 'channel',
             type: 7,
-            description: 'The channel for live notifications',
-            required: true
+            description: 'The channel for live notifications'
         }
     ],
     async execute(interaction, client) {
@@ -60,7 +59,7 @@ module.exports = {
                     console.log(user);
                     if(user != undefined) {
                         db.serialize(() => {
-                            db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${interaction.options.getChannel('channel').id}", "${interaction.options.getUser('user').id}", "offline")`, (err) => {
+                            db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${getChannelID(interaction.options.getChannel('channel'))}", "${interaction.options.getUser('user').id}", "${interaction.options.getUser('user').username}", "online")`, (err) => {
                                 if(err){
                                     logger.warn(err, this.name);
                                     interaction.reply({
@@ -96,7 +95,7 @@ module.exports = {
                             ephemeral: true
                         });
                     }
-                })
+                });
             }
             else if(type == 'remove') {
                 db.run(`DELETE FROM twitchAccounts WHERE discordID = "${interaction.options.getUser('user').id}"`, (err) => {
@@ -129,4 +128,13 @@ module.exports = {
 
 function formatCommas(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function getChannelID(channel) {
+    if(channel != null && channel != undefined) {
+        return channel.id;
+    }
+    else {
+        return config.discord.live_ch;
+    }
 }

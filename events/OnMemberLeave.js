@@ -1,5 +1,5 @@
 const Discord = require('discord.js');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 const config = require('../config.json');
 
 module.exports = function OnMemberLeave(member, client) {

@@ -2,14 +2,12 @@ const Discord = require('discord.js');
 const config = require('../config.json');
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 
 const addToVips = require('../functions/addToVips.js');
 
 module.exports = function(message, value) {
     var discordID = message.author.id;
-
-    logger.log(`New message from '${message.author.username}' (${message.channel.name})`);
 
     db.serialize(() => {
         db.run(`INSERT OR IGNORE INTO users VALUES("${discordID}", "${message.author.username}", "false", 0, 300, 0)`, (err) => {
@@ -23,7 +21,7 @@ module.exports = function(message, value) {
                 logger.error(err, "vipProgress");
             }
             else {
-                logger.log(`Updated messages count for '${message.author.username}'`);
+                logger.log(`Updated messages count for '${message.author.username}'`, "vipProgress");
             }
         });
 

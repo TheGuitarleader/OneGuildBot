@@ -1,6 +1,6 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
@@ -17,7 +17,7 @@ module.exports = {
                 embed.setColor(config.discord.embedHex);
                 embed.setTitle(":tada: Leaderboard");
                 rows.forEach((row) => {
-                    embed.addField(row.username, `${formatCommas(row.vipProgress)} messages this month, ${formatCommas(row.totalMessages)} total`);
+                    embed.addField(row.username, `${formatCommas(row.vipProgress)} msgs/mo, ${formatCommas(row.totalMessages)} total`);
                     totalMessages = totalMessages + row.totalMessages;
                 });
                 

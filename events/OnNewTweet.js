@@ -1,5 +1,5 @@
 const Discord = require('discord.js');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 const config = require('../config.json');
 
 module.exports = function OnNewTweet(tweet, client, db, users) {
@@ -9,7 +9,7 @@ module.exports = function OnNewTweet(tweet, client, db, users) {
         if(users.includes(tweet.user.id_str))
         {
             //logger.log(`Verified tweet: '@${tweet.user.screen_name}' (${tweet.user.id_str})`, 'twitter');
-            logger.log(`Received tweet: '@${tweet.user.screen_name}' (${tweet.id_str})`, 'twitter');
+            logger.logAPI(`Received tweet: '@${tweet.user.screen_name}' (${tweet.id_str})`, 'twitter');
             db.get(`SELECT * FROM tweetProfiles WHERE accountID = ?`, [tweet.user.id_str], (err, profile) => {
                 if(err)
                 {
@@ -135,11 +135,11 @@ function displayTweet(tweet, channel, client) {
         
         embed.setFooter({ text: 'Powered By Tweeter' });
         client.channels.cache.get(channel).send({embeds: [embed]});
-        logger.log(`Forwarding tweet from '${tweet.user.screen_name}' to '${client.channels.cache.get(channel).name}' ->`, 'twitter');
+        logger.logAPI(`Forwarding tweet from '${tweet.user.screen_name}' to '${client.channels.cache.get(channel).name}' ->`, 'twitter');
     }
     else
     {
-        logger.log(`Ignoring tweet from '${tweet.id_str}'`, 'twitter');
+        logger.warnAPI(`Ignoring tweet from '${tweet.id_str}'`, 'twitter');
     }
 }
 

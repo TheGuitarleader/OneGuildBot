@@ -2,7 +2,7 @@ const Discord = require('discord.js');
 const config = require('../config.json');
 const package = require('../package.json');
 const request = require('request');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 
 module.exports = {
     name: "bug",

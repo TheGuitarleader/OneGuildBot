@@ -3,7 +3,7 @@ const config = require('../config.json');
 const request = require('request');
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 const HelixAPI = require('simple-helix-api');
 const Twitch = new HelixAPI({
     access_token: config.twitch.access_token,
@@ -12,8 +12,6 @@ const Twitch = new HelixAPI({
 });
 
 module.exports = function OnNowLive(stream, client) {
-    logger.log(`User '${stream.user_name}' (${stream.user_id}) is now live.`, 'OnNowLive');
-
     var guild = client.guilds.cache.get(config.discord.guildID);
     db.get(`SELECT * FROM twitchAccounts WHERE twitchID = ?`, [stream.user_id], (err, user) => {
         if(err) {
@@ -21,17 +19,13 @@ module.exports = function OnNowLive(stream, client) {
         }
         else {
             guild.members.fetch(user.discordID).then((member) => {
-                displayLiveInfo(stream, member, client.channels.cache.get(user.channelID));
+                displayLiveInfo(stream, member, client.channels.cache.get(user.channelID), client);
             });
         }
     });
 }
 
-function displayLiveInfo(stream, member, channel) {
-    console.log(stream);
-    console.log(member.displayName);
-    console.log(channel.name);
-
+function displayLiveInfo(stream, member, channel, client) {
     Twitch.users.getByID(stream.user_id).then((user) => {
         const embed = new Discord.MessageEmbed()
         .setColor('#9146FF')
@@ -42,12 +36,14 @@ function displayLiveInfo(stream, member, channel) {
         .setImage(user.profile_image_url)
 
         if(member.roles.cache.find(r => r.name === "Guild Leaders") || member.roles.cache.find(r => r.name === "Guild Members")) {
+            createGuildEvent(member.displayName, stream, client);
             channel.send({
                 content: `🌹 **Hey! One of our Guild Members, ${member.displayName} is now LIVE on Twitch! Please go and show some One Guild Support!** 🌹`,
                 embeds: [ embed ]
             });
         }
         else if(member.roles.cache.find(r => r.name === "VIP")) {
+            createGuildEvent(member.displayName, stream, client);
             channel.send({
                 content: `Hey! One of our 🏅 VIP Members, ${member.displayName} is now LIVE on Twitch! Let's show them some One Guild Love!`,
                 embeds: [ embed ]
@@ -59,8 +55,30 @@ function displayLiveInfo(stream, member, channel) {
                 embeds: [ embed ]
             });
         }
+
+        logger.logAPI(`Forwarding live update from '${stream.user_login}' (${stream.user_id}) to '${channel.name}' (${channel.id}) ->`, 'OnNowLive');
     });
 };
+
+function createGuildEvent(name, stream, client) {
+    var guild = client.guilds.cache.get(config.discord.guildID);
+
+    var startDate = Date.now() + 10000;
+    var endDate = Date.now() + 7200000;
+
+    let description = `Hey everyone, ${name} is live! Please show some One Guild Support!`;
+    guild.scheduledEvents.create({
+        name: stream.title,
+        description: description,
+        scheduledStartTime: startDate,
+        scheduledEndTime: endDate,
+        privacyLevel: 'GUILD_ONLY',
+        entityType: 'EXTERNAL',
+        entityMetadata: {
+            location: `https://twitch.tv/${stream.user_login}`
+        }
+    })
+}
 
 function getImageUrl(url) {
     var apiUrl = url;

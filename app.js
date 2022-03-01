@@ -4,11 +4,11 @@ const Client = require('./client/client.js');
 const Twit = require('twit');
 const config = require('./config.json');
 const package = require('./package.json');
-const logger = require('kailogs');
 const clock = require('date-events')();
 const moment = require('moment');
 const HelixAPI = require('simple-helix-api');
 const request = require('request');
+const logger = require('./extensions/logging');
 
 // Functions
 const vip = require('./functions/vipProgress.js');
@@ -35,14 +35,15 @@ for(const file of commandFiles) {
 
 console.log(discordClient.commands);
 
-logger.loadLog('./logs');
+logger.loadLog('./logs/Console');
+logger.loadMessage('./logs/Messages');
+logger.loadAPI('./logs/API');
 logger.log(`${package.name} v${package.version}`, 'main');
 discordClient.login(config.discord.token);
 
 // Saves the log at 11:59pm
 clock.on('23:59', function (date) {
     logger.save();
-    logger.createLog('./logs');
 });
 
 discordClient.once('disconnect', () => {
@@ -65,6 +66,7 @@ discordClient.on('messageCreate', async message => {
     if(message.content.startsWith(config.discord.botPrefix)) return;
 
     if(message.guild.id == config.discord.guildID) {
+        logger.message(message.channel, message.author, message.content);
         vip(message, 1);
     }
 });
@@ -96,6 +98,25 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
             addToVips(newMember, channel, 90);
         });
     }
+
+    if(!oldMember.roles.cache.find(r => r.name === "Streamers") && newMember.roles.cache.find(r => r.name === "Streamers")) {
+        Twitch.users.getByLogin(newMember.user.username).then((user) => {
+            console.log(user);
+            if(user != undefined) {
+                db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online")`, (err) => {
+                    if(err){
+                        logger.warn(err, 'app');
+                    }
+                    else {
+                        logger.log(`Added new Twitch account '${user.display_name}' (${user.id})`, 'app');
+                    }
+                });
+            }
+            else {
+                logger.error(`Could not find a account called `);
+            }
+        });
+    }
 });
 
 
@@ -116,39 +137,50 @@ clock.on('*-*-* 00:00', function (rawDate) {
 
     logger.log(`Checking VIPs for today`)
     discordClient.guilds.fetch(config.discord.guildID).then((guild) => {
-        db.all(`SELECT * FROM vips WHERE expireDate = "${date}"`, (err, rows) => {
-            if(err){
-                console.log(err);
-                logger.error(err, 'app');
-            }
-            else
-            {
-                rows.forEach((row) => {
-                    guild.members.fetch(row.discordID).then((member) => {
-                        member.roles.remove(member.guild.roles.cache.find(r => r.name === "VIP"));
-
-                        db.serialize(() => {
-                            db.run(`DELETE FROM vips WHERE expireDate = "${date}"`, function(err) {
-                                if(err) {
-                                    logger.error(err, 'app');
-                                }
-                                else {
-                                    logger.log(`Removed VIP '${member.displayName}' (${member.user.id})`, 'app')
-                                }
-                            });
-
-                            db.run(`UPDATE users SET vipProgress = 0, isVIP = "false" WHERE discordID = "${member.user.id}"`, function(err) {
-                                if(err) {
-                                    logger.error(err, "vipProgress");
-                                }
-                                else {
-                                    logger.log(`Reset '${member.displayName}' (${member.user.id}) VIP progress`, 'app')
-                                }
-                            });
-                        })
+        db.serialize(() => {
+            db.all(`SELECT * FROM vips WHERE expireDate = "${date}"`, (err, rows) => {
+                if(err){
+                    console.log(err);
+                    logger.error(err, 'app');
+                }
+                else
+                {
+                    rows.forEach((row) => {
+                        guild.members.fetch(row.discordID).then((member) => {
+                            member.roles.remove(member.guild.roles.cache.find(r => r.name === "VIP"));
+    
+                            db.serialize(() => {
+                                db.run(`DELETE FROM vips WHERE expireDate = "${date}"`, function(err) {
+                                    if(err) {
+                                        logger.error(err, 'app');
+                                    }
+                                    else {
+                                        logger.log(`Removed VIP '${member.displayName}' (${member.user.id})`, 'app')
+                                    }
+                                });
+    
+                                db.run(`UPDATE users SET vipProgress = 0, isVIP = "false" WHERE discordID = "${member.user.id}"`, function(err) {
+                                    if(err) {
+                                        logger.error(err, "vipProgress");
+                                    }
+                                    else {
+                                        logger.log(`Reset '${member.displayName}' (${member.user.id}) VIP progress`, 'app')
+                                    }
+                                });
+                            })
+                        });
                     });
-                });
-            }
+                }
+            });
+
+            db.run(`UPDATE users SET vipProgress = 0`, function(err) {
+                if(err) {
+                    logger.error(err, "vipProgress");
+                }
+                else {
+                    logger.log(`Reset all users VIP progress`, 'app')
+                }
+            });
         });
     });
 });
@@ -189,20 +221,19 @@ const getTwitterUsers = () => {
 };
 
 getTwitterUsers().then((users) => {
-    logger.log('Gathered users from database', 'twitter');
+    logger.logAPI('Gathered users from database', 'twitter');
     var tweetStream = Twitter.stream('statuses/filter', { follow: users });
 
     tweetStream.on('disconnected', function(disconnect) {
-        logger.warn('Disconnected from follow tweet stream', 'twitter');
-        console.log(disconnect);
+        logger.warnAPI('Disconnected from follow tweet stream', 'twitter');
     });
 
     tweetStream.on('connect', function (request) {
-        logger.log('Connecting to follow tweetStream...', 'twitter');
+        logger.logAPI('Connecting to follow tweetStream...', 'twitter');
     });
 
     tweetStream.on('connected', function (response) {
-        logger.log(`Connected to tweetStream with message: '${response.statusMessage}' (Code: ${response.statusCode})`, 'twitter');
+        logger.logAPI(`Connected to tweetStream with message: '${response.statusMessage}' (Code: ${response.statusCode})`, 'twitter');
     });
 
     tweetStream.on('tweet', function(tweet) {
@@ -228,12 +259,13 @@ function getTwitchToken() {
             return data.data.access_token;
         }
         else {
-            logger.log(`Error: '${err}' with message: '${res.statusMessage}' (Code: ${res.statusCode})`, 'getTwitchToken');
+            logger.logAPI(`Error: '${err}' with message: '${res.statusMessage}' (Code: ${res.statusCode})`, 'getTwitchToken');
         }
     });
 }
 
 setInterval(async function() {
+    console.log("Refreshing Twitch streams...");
     await checkOfflineUsers(discordClient);
     await checkOnlineUsers();
 }, 20000);

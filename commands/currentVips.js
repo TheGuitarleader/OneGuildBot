@@ -1,6 +1,6 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');

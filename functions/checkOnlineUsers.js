@@ -3,7 +3,7 @@ const config = require('../config.json');
 const request = require('request');
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 
 module.exports = async function() {
     getDBInfo().then((users) => {
@@ -23,13 +23,18 @@ module.exports = async function() {
                     'bearer': config.twitch.access_token
                 }
             }, (err, res, body) => {
-                var data = JSON.parse(body);
-                let streams = [];
-                data.data.forEach((s) => {
-                    streams.push(s.user_id);
-                })
-
-                findOfflineStreams(streams, users);
+                if (!err && res.statusCode == 200) {
+                    var data = JSON.parse(body);
+                    let streams = [];
+                    data.data.forEach((s) => {
+                        streams.push(s.user_id);
+                    })
+    
+                    findOfflineStreams(streams, users);
+                }
+                else {
+                    logger.warnAPI(`Returned Error: '${err}' with message: '${res.statusMessage}' (Code: ${res.statusCode})`, 'checkOnlineUsers');
+                }
             });
         }
     })

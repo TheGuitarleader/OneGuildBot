@@ -3,7 +3,7 @@ const config = require('../config.json');
 const request = require('request');
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
-const logger = require('kailogs');
+const logger = require('../extensions/logging');
 
 const OnNowLive = require('../events/OnNowLive.js');
 
@@ -25,20 +25,26 @@ module.exports = async function(client) {
                     'bearer': config.twitch.access_token
                 }
             }, (err, res, body) => {
-                var data = JSON.parse(body);
-                let streams = data.data;
-    
-                streams.forEach((stream) => {
-                    db.run(`UPDATE twitchAccounts SET status = "online" WHERE twitchID = "${stream.user_id}"`, function(err) {
-                        if(err) {
-                            logger.error(err, 'checkOfflineUsers');
-                        }
-                        else {
-                            // Forward live notifcations
-                            OnNowLive(stream, client);
-                        }
+                if (!err && res.statusCode == 200) {
+                    var data = JSON.parse(body);
+                    let streams = data.data;
+        
+                    streams.forEach((stream) => {
+                        db.run(`UPDATE twitchAccounts SET status = "online" WHERE twitchID = "${stream.user_id}"`, function(err) {
+                            if(err) {
+                                logger.error(err, 'checkOfflineUsers');
+                            }
+                            else {
+                                // Forward live notifcations
+                                logger.logAPI(`User '${stream.user_name}' (${stream.user_id}) is now live.`, 'checkOfflineUsers');
+                                OnNowLive(stream, client);
+                            }
+                        });
                     });
-                });
+                }
+                else {
+                    logger.warnAPI(`Returned Error: '${err}' with message: '${res.statusMessage}' (Code: ${res.statusCode})`, 'checkOfflineUsers');
+                }
             });
         }
     })

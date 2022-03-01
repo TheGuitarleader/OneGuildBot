@@ -2,7 +2,6 @@
   "dependencies": {
     "date-events": "^1.0.1",
     "discord.js": "^13.5.0",
-    "kailogs": "^3.1.1",
     "moment": "^2.29.1",
     "request": "^2.88.2",
     "simple-helix-api": "^2.1.2",
@@ -10,7 +9,7 @@
     "twit": "^2.2.11"
   },
   "name": "onesiebot",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "a discord bot",
   "main": "app.js",
   "scripts": {
