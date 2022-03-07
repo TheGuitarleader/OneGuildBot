@@ -15,6 +15,10 @@ const addToVips = require('./functions/addToVips.js');
 const checkOfflineUsers = require('./functions/checkOfflineUsers.js');
 const checkOnlineUsers = require('./functions/checkOnlineUsers.js');
 
+// Functions
+const vip = require('./functions/vipProgress.js');
+const addToVips = require('./functions/addToVips.js');
+
 // Events
 const OnMemberJoin = require('./events/OnMemberJoin');
 const OnMemberLeave = require('./events/OnMemberLeave');
@@ -77,6 +81,7 @@ discordClient.once('disconnect', () => {
 
 discordClient.once('ready', () => {
     logger.info('Online and connected to Discord');
+
     //discordClient.user.setPresence({ activities: [{ name: `Beta v${package.version}` }], status: 'online' });
     discordClient.guilds.fetch(config.discord.guildID).then((g) => {
         g.commands.set(discordClient.commands);
