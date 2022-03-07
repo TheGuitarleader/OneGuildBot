@@ -1,6 +1,5 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-const logger = require('../extensions/logging');
 
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
@@ -16,13 +15,13 @@ module.exports = {
           required: true
         }
     ],
-    async execute(interaction, client) {
+    async execute(logger, interaction, client) {
         if(config.discord.ownerIDs.includes(interaction.member.id)) {
             var vips = [];
             db.all(`SELECT * FROM vips ORDER BY username ASC`, (err, data) => {
                 if(err){
                     console.log(err);
-                    logger.log(err, 'commands', 'ERROR');
+                    logger.error(err);
                 }
                 data.forEach((rows) => {
                     vips.push(rows);
@@ -61,6 +60,7 @@ module.exports = {
                         }
     
                         embed.setFooter({ text: `Currently ${vips.length} VIPs` });
+                        logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
                         interaction.reply({
                             embeds: [ embed ],
                             ephemeral: true
@@ -68,6 +68,7 @@ module.exports = {
                     }
                     else
                     {
+                        logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
                         interaction.reply({
                             content: ":x: **Sorry, you don't have that many VIPs**",
                             ephemeral: true
@@ -77,6 +78,7 @@ module.exports = {
             });
         }
         else {
+            logger.info(`Unauthorized ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
             interaction.reply({
                 content: ":no_entry_sign: **Unauthorized**",
                 ephemeral: true

@@ -1,39 +1,32 @@
 const Discord = require('discord.js');
-const logger = require('../extensions/logging');
 const config = require('../config.json');
 
-module.exports = function OnNewTweet(tweet, client, db, users) {
-    try {
-        //logger.log(`Received tweet: '@${tweet.user.screen_name}' (${tweet.user.id_str})`, 'twitter');
-
-        if(users.includes(tweet.user.id_str))
-        {
-            //logger.log(`Verified tweet: '@${tweet.user.screen_name}' (${tweet.user.id_str})`, 'twitter');
-            logger.logAPI(`Received tweet: '@${tweet.user.screen_name}' (${tweet.id_str})`, 'twitter');
-            db.get(`SELECT * FROM tweetProfiles WHERE accountID = ?`, [tweet.user.id_str], (err, profile) => {
-                if(err)
+module.exports = function OnNewTweet(logger, tweet, client, db, users) {
+    if(users.includes(tweet.user.id_str))
+    {
+        //logger.log(`Verified tweet: '@${tweet.user.screen_name}' (${tweet.user.id_str})`, 'twitter');
+        logger.info(`Received tweet: '@${tweet.user.screen_name}' (https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str})`);
+        db.get(`SELECT * FROM tweetProfiles WHERE accountID = ?`, [tweet.user.id_str], (err, profile) => {
+            if(err)
+            {
+                logger.error(`Database returned error: '${err}'`)
+            }
+            else
+            {
+                if(tweet.retweeted_status != undefined && profile.showRetweets == "true")
                 {
-                    logger.error(`Database returned error: '${err}'`, 'twitter')
+                    displayTweet(tweet, profile.channelID, client);
                 }
-                else
+                else if(tweet.in_reply_to_status_id != null && profile.showReplies == "true")
                 {
-                    if(tweet.retweeted_status != undefined && profile.showRetweets == "true")
-                    {
-                        displayTweet(tweet, profile.channelID, client);
-                    }
-                    else if(tweet.in_reply_to_status_id != null && profile.showReplies == "true")
-                    {
-                        displayTweet(tweet, profile.channelID, client);
-                    }
-                    else if(tweet.in_reply_to_status_id == null && tweet.retweeted_status == undefined)
-                    {
-                        displayTweet(tweet, profile.channelID, client);
-                    }
+                    displayTweet(tweet, profile.channelID, client);
                 }
-            });
-        }
-    } catch (err) {
-        logger.error(err, 'twitter');
+                else if(tweet.in_reply_to_status_id == null && tweet.retweeted_status == undefined)
+                {
+                    displayTweet(tweet, profile.channelID, client);
+                }
+            }
+        });
     }
 };
 
@@ -135,11 +128,11 @@ function displayTweet(tweet, channel, client) {
         
         embed.setFooter({ text: 'Powered By Tweeter' });
         client.channels.cache.get(channel).send({embeds: [embed]});
-        logger.logAPI(`Forwarding tweet from '${tweet.user.screen_name}' to '${client.channels.cache.get(channel).name}' ->`, 'twitter');
+        logger.info(`Forwarding tweet from '${tweet.user.screen_name}' to '${client.channels.cache.get(channel).name}' ->`);
     }
     else
     {
-        logger.warnAPI(`Ignoring tweet from '${tweet.id_str}'`, 'twitter');
+        logger.info(`Ignoring tweet from '${tweet.id_str}'`);
     }
 }
 

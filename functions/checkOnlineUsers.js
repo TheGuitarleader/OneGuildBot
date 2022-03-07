@@ -3,9 +3,8 @@ const config = require('../config.json');
 const request = require('request');
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
-const logger = require('../extensions/logging');
 
-module.exports = async function() {
+module.exports = async function(logger) {
     getDBInfo().then((users) => {
         if(users.length > 0 && users != undefined) {
             var format = "https://api.twitch.tv/helix/streams?";
@@ -30,10 +29,10 @@ module.exports = async function() {
                         streams.push(s.user_id);
                     })
     
-                    findOfflineStreams(streams, users);
+                    findOfflineStreams(logger, streams, users);
                 }
                 else {
-                    logger.warnAPI(`Returned Error: '${err}' with message: '${res.statusMessage}' (Code: ${res.statusCode})`, 'checkOnlineUsers');
+                    logger.warn(`Returned Error: '${err}'`);
                 }
             });
         }
@@ -54,16 +53,17 @@ const getDBInfo = () => {
     })
 };
 
-function findOfflineStreams(streamsArray, userArray) {
+function findOfflineStreams(logger, streamsArray, userArray) {
     var userArraySize = userArray.length;
  
     for(var i = 0; i < userArraySize; i++) {
        if (streamsArray.indexOf(userArray[i]) == -1) {
-           console.log(userArray[i]);
+           logger.info(`User ${userArray[i]} is now offline`);
+
            db.serialize(() => {
                db.run(`UPDATE twitchAccounts SET status = "offline" WHERE twitchID = "${userArray[i]}"`, function(err) {
                    if(err) {
-                       logger.error(err, 'checkOnlineUsers');
+                       logger.error(err);
                    }
                });              
            });

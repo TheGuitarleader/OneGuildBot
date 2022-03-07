@@ -1,0 +1,11 @@
+Major changes:
+- Overhauled the entire logging framework to help find breaking issues.
+- New 'changelog' command. View whats changed with the bot. (#5)
+
+Minor changes:
+- Increased Twitch update refresh from 30s -> 60s.
+- Changed the way the Tweeter logs received tweets.
+- Ping command now shows Twitch API response time. (Shown as ':microphone2:')
+
+
+If you find any bugs please type '/bug' or report them at: https://github.com/TheGuitarleader/OneGuildBot/issues

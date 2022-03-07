@@ -1,6 +1,5 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-const logger = require('../extensions/logging');
 
 const Twit = require('twit');
 const sqlite = require('sqlite3').verbose();
@@ -66,7 +65,7 @@ module.exports = {
             description: 'If I should send you the users retweets. Default: false'
         }
     ],
-    async execute(interaction, client) {
+    async execute(logger, interaction, client) {
         if(config.discord.ownerIDs.includes(interaction.member.id)) {
             var type = interaction.options.get('type').value;
             if(type == 'add') {
@@ -106,6 +105,7 @@ module.exports = {
                                     .addField("Followers", formatCommas(data.followers_count), true)
                                     .setFooter({ text: 'Powered By Tweeter' })
       
+                                    logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
                                     interaction.reply({
                                         content: ':white_check_mark: **Successfully started following `' + data.screen_name + '`.**  *Please allow up to a hour to start receiving tweets!*',
                                         embeds: [ embed ],
@@ -120,7 +120,7 @@ module.exports = {
             else if(type == 'update') {
                 db.run(`UPDATE tweetProfiles SET channelID = "${interaction.options.getChannel('channel').id}", showReplies = "${defaultBool(interaction.options.get('show_replies'))}", showRetweets = "${defaultBool(interaction.options.get('show_retweets'))}" WHERE discordID = "${interaction.options.getUser('user').id}"`, (err) => {
                     if(err){
-                        logger.warn(err, 'twitter');
+                        logger.warn(err);
                         interaction.reply({
                             content: '```' + err + '```',
                             ephemeral: true
@@ -128,7 +128,7 @@ module.exports = {
                     }
                     else
                     {
-                        logger.log(`Updated ${interaction.options.getUser('user').username}'s profile (${interaction.options.getUser('user').id})`, 'twitter');
+                        logger.info(`Updated ${interaction.options.getUser('user').username}'s profile (${interaction.options.getUser('user').id})`);
                         interaction.reply({
                             content: ':white_check_mark: **Successfully updated profile.**',
                             ephemeral: true
@@ -145,11 +145,11 @@ module.exports = {
                         else {
                             db.run(`DELETE FROM tweetAccounts WHERE ID = "${row.accountID}"`, (err) => {
                                 if(err){
-                                    logger.error(err, 'twitter');
+                                    logger.warn(err);
                                 }
                                 else
                                 {
-                                    logger.log(`Removed account '${interaction.options.getUser('user').username}' from database`, 'twitter');
+                                    logger.info(`Removed account '${interaction.options.getUser('user').username}' from database`);
                                 }
                             });
                         }
@@ -157,8 +157,7 @@ module.exports = {
     
                     db.run(`DELETE FROM tweetProfiles WHERE discordID = "${interaction.options.getUser('user').id}"`, (err) => {
                         if(err){
-                            message.channel.send(':x: **Failed to remove account!**');
-                            logger.error(err, 'twitter');
+                            logger.error(err);
                             interaction.reply({
                                 content: ':x: **Failed to remove account!** ```' + err + '```',
                                 ephemeral: true
@@ -166,7 +165,7 @@ module.exports = {
                         }
                         else
                         {
-                            logger.log(`Removed account '${interaction.options.getUser('user').username}' from profiles`, 'twitter');
+                            logger.info(`Removed account '${interaction.options.getUser('user').username}' from profiles`);
                             interaction.reply({
                                 content: ':white_check_mark: **Successfully unfollowed** `' + interaction.options.getUser('user').username + '`',
                                 ephemeral: true
@@ -177,8 +176,9 @@ module.exports = {
             }
         }
         else {
+            logger.info(`Unauthorized ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
             interaction.reply({
-                content: ":no_entry_sign: **Unauthorised**",
+                content: ":no_entry_sign: **Unauthorized**",
                 ephemeral: true
             });
         }

@@ -1,6 +1,5 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-const logger = require('../extensions/logging');
 
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
@@ -16,7 +15,7 @@ module.exports = {
           required: true
         }
     ],
-    async execute(interaction, client) {
+    async execute(logger, interaction, client) {
         if(config.discord.ownerIDs.includes(interaction.member.id)) {
             var members = [];
             db.all(`SELECT * FROM users ORDER BY username ASC`, (err, data) => {
@@ -61,6 +60,7 @@ module.exports = {
                         }
     
                         embed.setFooter({ text: `Currently ${members.length} members` });
+                        logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
                         interaction.reply({
                             embeds: [ embed ],
                             ephemeral: true
@@ -77,6 +77,7 @@ module.exports = {
             });
         }
         else {
+            logger.info(`Unauthorized ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
             interaction.reply({
                 content: ":no_entry_sign: **Unauthorized**",
                 ephemeral: true

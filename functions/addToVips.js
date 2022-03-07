@@ -2,9 +2,8 @@ const Discord = require('discord.js');
 const config = require('../config.json');
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
-const logger = require('../extensions/logging');
 
-module.exports = function(member, channel, dateAmount) {
+module.exports = function(logger, member, channel, dateAmount) {
     var date = new Date();
     var expireDate = FormatDate(date, dateAmount);
 

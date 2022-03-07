@@ -2,12 +2,11 @@ const Discord = require('discord.js');
 const config = require('../config.json');
 const package = require('../package.json');
 const request = require('request');
-const logger = require('../extensions/logging');
 
 module.exports = {
     name: "bug",
     description: "Links to the bug tracker.",
-    async execute(interaction, client) {
+    async execute(logger, interaction, client) {
         var options = {
             url: 'https://api.github.com/repos/TheGuitarleader/OneGuildBot/issues?state=all',
             headers: {
@@ -48,7 +47,7 @@ module.exports = {
                 });
 
                 const embed = new Discord.MessageEmbed()
-                .setColor(config.discord.embed_hex)
+                .setColor(config.discord.embedHex)
                 .setTitle(`One Guild Bug Tracker`)
                 .setThumbnail(interaction.client.user.avatarURL())
                 .setDescription(`This helps us keep track of bugs and possible \nthings to add to make the bot even better!\n
@@ -56,13 +55,13 @@ module.exports = {
                 - Click the link above.
                 - Fill out the title and add a brief description.
                 - Add the necessary label if its a bug or a feature.`)
-                .addField("Features Submitted", featureRequests, false)
-                .addField("Known Bugs", activeBugs, true)
-                .addField("Bugs Fixed", fixedBugs, true)
+                .addField("Features Submitted", featureRequests.toString(), false)
+                .addField("Known Bugs", activeBugs.toString(), true)
+                .addField("Bugs Fixed", fixedBugs.toString(), true)
                 .setURL("https://github.com/TheGuitarleader/OneGuildBot/issues/new")
-                .setFooter("Powered By Quentin")  
+                .setFooter({ text: 'Powered By Quentin' });
                 interaction.reply({embeds: [embed] });
-                logger.log(`Showed bug tracker on guild '${message.guild.name}' (${message.guild.id})`, this.name);
+                logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
             }
         }
           
