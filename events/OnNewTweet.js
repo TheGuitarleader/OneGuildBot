@@ -15,15 +15,15 @@ module.exports = function OnNewTweet(logger, tweet, client, db, users) {
             {
                 if(tweet.retweeted_status != undefined && profile.showRetweets == "true")
                 {
-                    displayTweet(tweet, profile.channelID, client);
+                    displayTweet(logger, tweet, profile.channelID, client);
                 }
                 else if(tweet.in_reply_to_status_id != null && profile.showReplies == "true")
                 {
-                    displayTweet(tweet, profile.channelID, client);
+                    displayTweet(logger, tweet, profile.channelID, client);
                 }
                 else if(tweet.in_reply_to_status_id == null && tweet.retweeted_status == undefined)
                 {
-                    displayTweet(tweet, profile.channelID, client);
+                    displayTweet(logger, tweet, profile.channelID, client);
                 }
             }
         });
