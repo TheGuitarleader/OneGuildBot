@@ -1,3 +1,5 @@
+# v0.6.0 / 2022-03-07
+
 Major changes:
 - Overhauled the entire logging framework to help find breaking issues.
 - New 'changelog' command. View whats changed with the bot. (#5)

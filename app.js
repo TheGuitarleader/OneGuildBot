@@ -47,7 +47,7 @@ logger.info(`${package.name} v${package.version}`, 'app');
 
 logger.on('error', function(err) {
     discordClient.users.fetch('190612480958005248').then(user => {
-        user.send(err).then(msg => {
+        user.send('```js' + err + '```').then(msg => {
             process.exit();
         })
     })
