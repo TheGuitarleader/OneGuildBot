@@ -86,7 +86,7 @@ module.exports = function OnNewTweet(logger, tweet, client, db, users) {
 
 
 
-function displayTweet(tweet, channel, client) {
+function displayTweet(logger, tweet, channel, client) {
     const embed = new Discord.MessageEmbed();
     embed.setColor(tweet.user.profile_link_color)
 

@@ -1,11 +1,16 @@
 const Discord = require('discord.js');
+const KaiLogs = require('kailogs');
 const config = require('../config.json');
 const request = require('request');
 const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
 
 const OnNowLive = require('../events/OnNowLive.js');
-
+/**
+ * 
+ * @param {KaiLogs.Logger} logger 
+ * @param {Discord.Client} client 
+ */
 module.exports = async function(logger, client) {
     getDBInfo().then((users) => {
         if(users.length > 0 && users != undefined) {
