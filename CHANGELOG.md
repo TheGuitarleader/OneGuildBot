@@ -4,11 +4,12 @@
 
 Major changes:
 - Overhaulled live post system. New system is now more efficent
-- New `announce` command. Say something as the bot.
+- New `announce` command. Say something as the bot.  (Use a semicolon `;` to add a line break.)
 - New `rolldice` command. Roll some dice with your friends!
 
 Minor changes:
 - Changed formating for errors and changelog.
+- Now removes remove member from database when they leave the server.
 
 Bug Fixes:
 - Fixed Twitch double posting live updates (#4)
@@ -21,7 +22,7 @@ Bug Fixes:
 Major changes:
 - Overhauled the entire logging framework to help find breaking issues.
 - New 'changelog' command. View whats changed with the bot. (#5)
-- Changed command 'vips' -> 'vip-list'
+- Changed command `vips` -> `vip-list`
 
 Minor changes:
 - Increased Twitch update refresh from 30s -> 60s.
