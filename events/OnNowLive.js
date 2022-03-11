@@ -77,7 +77,13 @@ function createGuildEvent(logger, name, stream, client) {
         entityMetadata: {
             location: `https://twitch.tv/${stream.user_login}`
         }
-    })
+    }).then((guildEvent) => {
+        db.run(`UPDATE twitchAccounts SET eventID = "${guildEvent.id}" WHERE twitchID = "${stream.user_id}"`, function(err) {
+            if(err) {
+                logger.error(err);
+            }
+        });
+    });
 }
 
 function getImageUrl(url) {

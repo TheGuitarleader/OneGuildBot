@@ -18,30 +18,34 @@ module.exports = function(logger, message, value) {
                 logger.error(err);
             }
             else {
-                logger.info(`Updated messages count for '${message.author.username}'`);
+                //logger.info(`Updated messages count for '${message.author.username}'`);
             }
         });
 
         message.guild.members.fetch(message.author.id).then((member) => {
-            if(!member.roles.cache.find(r => r.name === "Guild Managers") && !member.roles.cache.find(r => r.name === "Guild Members"))
-            {
-                db.get(`SELECT * FROM users WHERE discordID = "${message.author.id}" AND isVIP = "false"`, [], (err, row) => {
-                    if(err) {
-                        logger.error(err);
-                    }
-                    else if(row != undefined) {
-                        if(row.vipProgress >= row.toVIP) {
-                            addToVips(member, message.channel, 30);
+            if(message.channel.id != config.discord.live_ch) {
+                if(!member.roles.cache.find(r => r.name === "Guild Leaders") && !member.roles.cache.find(r => r.name === "Guild Managers") && !member.roles.cache.find(r => r.name === "Guild Members"))
+                {
+                    db.get(`SELECT * FROM users WHERE discordID = "${message.author.id}" AND isVIP = "false"`, [], (err, row) => {
+                        if(err) {
+                            logger.error(err);
                         }
-                    }
-                    else {
-                        //logger.warn(`Ignoring '${member.displayName}' because they are already a VIP!`, 'vipProgress');
-                    }
-                });
+                        else if(row != undefined) {
+                            if(row.vipProgress >= row.toVIP) {
+                                addToVips(logger, member, message.channel, 30);
+                            }
+                        }
+                        else {
+                            logger.warn(`Ignoring '${member.displayName}' because they are already a VIP!`, 'vipProgress');
+                        }
+                    });
+                }
+                else {
+                    logger.warn(`Ignoring '${member.displayName}' because they are either a 'Guild Manager' or 'Guild Member'`, 'vipProgress');
+                }
             }
-            else
-            {
-                //logger.warn(`Ignoring '${member.displayName}' because they are either a 'Guild Manager' or 'Guild Member'`, 'vipProgress');
+            else {
+                logger.warn(`Ignoring message in live channel`, 'vipProgress');
             }
         });
     })

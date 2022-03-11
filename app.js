@@ -12,17 +12,13 @@ const request = require('request');
 // Functions
 const vip = require('./functions/vipProgress.js');
 const addToVips = require('./functions/addToVips.js');
-const checkOfflineUsers = require('./functions/checkOfflineUsers.js');
-const checkOnlineUsers = require('./functions/checkOnlineUsers.js');
-
-// Functions
-const vip = require('./functions/vipProgress.js');
-const addToVips = require('./functions/addToVips.js');
+const checkTwitchUsers = require('./functions/checkTwitchUsers.js');
 
 // Events
 const OnMemberJoin = require('./events/OnMemberJoin');
 const OnMemberLeave = require('./events/OnMemberLeave');
 const OnNewTweet = require('./events/OnNewTweet');
+const OnNewInteraction = require('./events/OnInteraction');
 
 const discordClient = new Client();
 discordClient.commands = new Discord.Collection();
@@ -47,7 +43,7 @@ logger.info(`${package.name} v${package.version}`, 'app');
 
 logger.on('error', function(err) {
     discordClient.users.fetch('190612480958005248').then(user => {
-        user.send('```js' + err + '```').then(msg => {
+        user.send('```js\n' + err + '```').then(msg => {
             process.exit();
         })
     })
@@ -81,7 +77,6 @@ discordClient.once('disconnect', () => {
 
 discordClient.once('ready', () => {
     logger.info('Online and connected to Discord');
-
     //discordClient.user.setPresence({ activities: [{ name: `Beta v${package.version}` }], status: 'online' });
     discordClient.guilds.fetch(config.discord.guildID).then((g) => {
         g.commands.set(discordClient.commands);
@@ -110,20 +105,7 @@ discordClient.on('messageUpdate', (oldMessage, newMessage) => {
 // Handle interactions
 discordClient.on('interactionCreate', async interaction => {
     logger.info(`Received interaction: '${interaction.id}' from '${interaction.member.displayName}'`);
-    const command = discordClient.commands.get(interaction.commandName.toLowerCase());
-
-    try {
-        command.execute(logger, interaction, discordClient); 
-        logger.info(`Ran command: '${command.name}' from '${interaction.member.displayName}'`);
-        
-    } catch(err) {
-        logger.warn(`Unknown command: '${interaction.id}' from '${message.author.username}' (${interaction.guild.name})`);
-        logger.error(err);
-        interaction.followUp({
-            content: ':x: `' + err + '`',
-            ephemeral: true
-        });
-    }
+    OnNewInteraction(logger, interaction, discordClient);
 });
 
 // Member Update
@@ -137,7 +119,7 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
     
         if(!oldMember.roles.cache.find(r => r.name === "Streamers") && newMember.roles.cache.find(r => r.name === "Streamers")) {
             Twitch.users.getByLogin(newMember.user.username).then((user) => {
-                console.log(user);
+                logger.info(`Searching Twitch for: '${user.display_name}'`);
                 if(user != undefined && user.id != undefined && user.display_name != null) {
                     db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online")`, (err) => {
                         if(err){
@@ -149,7 +131,7 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
                     });
                 }
                 else {
-                    logger.error(`Could not find a Twitch account called ${newMember.user.username}`);
+                    logger.warn(`Could not find a Twitch account called ${newMember.user.username}`);
                 }
             });
         }
@@ -232,6 +214,17 @@ function FormatDate(date)
     return year + '-' + month + '-' + day;
 }
 
+// function GetTime()
+// {
+//     var time = new Date();
+//     hours = ("0" + time.getHours()).slice(-2);
+//     var minutes = new Date().getMinutes();
+//     minutes = ("0" + time.getMinutes()).slice(-2);
+//     var seconds = new Date().getSeconds();
+//     seconds = ("0" + time.getSeconds()).slice(-2);
+//     return hours + ":" + minutes + ":" + seconds
+// }
+
 
 //
 // Twitter API
@@ -302,7 +295,6 @@ function getTwitchToken() {
     });
 }
 
-setInterval(async function() {
-    await checkOfflineUsers(logger, discordClient);
-    await checkOnlineUsers(logger);
-}, 10000);
+clock.on('*:*', function(rawTime) {
+    checkTwitchUsers(logger, discordClient, rawTime);
+});

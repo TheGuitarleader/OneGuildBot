@@ -12,7 +12,7 @@ module.exports = {
         
         const embed = new Discord.MessageEmbed()
         .setColor(config.discord.embedHex)
-        .setTitle(`What's new with ${client.user.username}?`)
+        .setTitle(`What's new with ${client.user.username} v${package.version}?`)
         .setDescription(changelog)
 
         logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);

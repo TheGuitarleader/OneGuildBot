@@ -5,7 +5,7 @@ const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
 
 module.exports = {
-    name: "vips",
+    name: "vip-list",
     description: "Lists the vips",
     options: [
         {

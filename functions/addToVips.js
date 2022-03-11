@@ -8,6 +8,7 @@ module.exports = function(logger, member, channel, dateAmount) {
     var expireDate = FormatDate(date, dateAmount);
 
     console.log(expireDate);
+    console.log(member.user);
 
     db.run(`INSERT OR REPLACE INTO vips(discordID, username, expireDate) VALUES("${member.user.id}", "${member.displayName}", "${expireDate}")`, function(err) {
         if(err) {
