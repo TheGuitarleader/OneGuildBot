@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v0.8.0 / 2022-03-22
+
+Major changes:
+- VIP threshold now dynamically changes based off previous values. Making it easier to hit VIP.
+- New `serverstats` command for admins. Shows server performance.
+- `announce` command is now `embed`. Added more customization features.
+- New `giveaway` command for admins. Picks random user that meets a 'active' requirement.
+
+Minor changes:
+- Changed function params to make future updates easier.
+- Made dice game more like Yahtzee.
+- Added leaderboard to the dice game.
+- Increased live post cooldown from 2 hours -> 4 hours.
+
 ## v0.7.0 / 2022-03-10
 
 Major changes:
