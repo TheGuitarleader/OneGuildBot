@@ -1,13 +1,19 @@
-# v0.6.0 / 2022-03-07
-
 Major changes:
-- Overhauled the entire logging framework to help find breaking issues.
-- New 'changelog' command. View whats changed with the bot. (#5)
+- VIP threshold now dynamically changes based off previous values. Making it easier to hit VIP.
+- New `serverstats` command for admins. Shows server performance.
+- `announce` command is now `embed`. Added more customization features.
+- New `giveaway` command for admins. Picks random user that meets a 'active' requirement.
 
 Minor changes:
-- Increased Twitch update refresh from 30s -> 60s.
-- Changed the way the Tweeter logs received tweets.
-- Ping command now shows Twitch API response time. (Shown as ':microphone2:')
+- Changed function params to make future updates easier.
+- Made dice game more like Yahtzee.
+- Added leaderboard to the dice game.
+- Increased live post cooldown from 2 hours -> 4 hours.
 
+-------------------------------------------------------
 
-If you find any bugs please type '/bug' or report them at: https://github.com/TheGuitarleader/OneGuildBot/issues
+If you find any bugs please type '/bug' or report them at: 
+https://github.com/TheGuitarleader/OneGuildBot/issues
+
+Full changelog: 
+https://github.com/TheGuitarleader/OneGuildBot/blob/main/CHANGELOG.md
