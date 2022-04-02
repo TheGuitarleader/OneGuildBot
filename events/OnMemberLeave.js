@@ -1,27 +1,45 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
+const sqlite = require('sqlite3').verbose();
+let db = new sqlite.Database('./data.db');
 
 module.exports = function OnMemberLeave(logger, member, client) {
-    try {
-        var createdDate = new Date(member.joinedAt);
-        console.log(createdDate);
-    
-        // const embed = new Discord.MessageEmbed()
-        // .setColor('E74C3C')
-        // .setAuthor(`${member.user.username}#${member.user.discriminator} left the guild`)
-        // .addField('Total Users:', member.guild.memberCount.toString(), true)
-        // .addField('Member since:', `${createdDate.toString().split(" ").slice(0, 4).join(" ")} (${getActiveDays(member.joinedAt)} days old)`, true)
-        // .setFooter("ID: " + member.user.id)
-    
-        // if(config.discord.logging != null) {
-        //     client.channels.cache.get(config.discord.logging).send({ embeds: [embed] });
-        // }
-    
-        logger.info(`User '${member.displayName}' (${member.id}) left server. (Joined ${getActiveDays(member.joinedAt)} days ago)`);
+    var createdDate = new Date(member.joinedAt);
+    console.log(createdDate);
 
-    } catch (err) {
-        logger.error(err);
-    };
+    logger.info(`User '${member.displayName}' (${member.user.id}) left server. (Joined ${getActiveDays(member.joinedAt)} days ago)`);
+
+    db.serialize(() => {
+        db.run(`DELETE FROM tweetProfiles WHERE discordID = "${member.user.id}"`, (err) => {
+            if(err) {
+                logger.error(err);
+            }
+        });
+
+        db.run(`DELETE FROM twitchAccounts WHERE discordID = "${member.user.id}"`, (err) => {
+            if(err) {
+                logger.error(err);
+            }
+        });
+
+        db.run(`DELETE FROM users WHERE discordID = "${member.user.id}"`, (err) => {
+            if(err) {
+                logger.error(err);
+            }
+        });
+
+        db.run(`DELETE FROM messageHistory WHERE discordID = "${member.user.id}"`, (err) => {
+            if(err) {
+                logger.error(err);
+            }
+        });
+
+        db.run(`DELETE FROM diceRollPoints WHERE discordID = "${member.user.id}"`, (err) => {
+            if(err) {
+                logger.error(err);
+            }
+        });
+    });
 };
 
 function getActiveDays(date) {

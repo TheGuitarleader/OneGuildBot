@@ -27,12 +27,15 @@ module.exports = function OnNowLive(logger, stream, client) {
 function displayLiveInfo(logger, stream, member, channel, client) {
     Twitch.users.getByID(stream.user_id).then((user) => {
         const embed = new Discord.MessageEmbed()
-        .setColor('#9146FF')
-        .setAuthor({ name: user.display_name, iconURL: user.profile_image_url})
-        .setTitle(stream.title)
-        .setURL(`https://twitch.tv/${stream.user_login}`)
-        .addField('Game', stream.game_name, true)
-        .setImage(user.profile_image_url)
+        embed.setColor('#9146FF')
+        embed.setAuthor({ name: user.display_name, iconURL: user.profile_image_url})
+        embed.setTitle(stream.title)
+        embed.setURL(`https://twitch.tv/${stream.user_login}`)
+        embed.setImage(user.profile_image_url)
+
+        if(stream.game_name != null && stream.game_name != undefined) {
+            embed.addField('Game', stream.game_name, true)
+        }
 
         if(member.roles.cache.find(r => r.name === "Guild Leaders") || member.roles.cache.find(r => r.name === "Guild Members")) {
             createGuildEvent(logger, member.displayName, stream, client);
@@ -77,7 +80,13 @@ function createGuildEvent(logger, name, stream, client) {
         entityMetadata: {
             location: `https://twitch.tv/${stream.user_login}`
         }
-    })
+    }).then((guildEvent) => {
+        db.run(`UPDATE twitchAccounts SET eventID = "${guildEvent.id}" WHERE twitchID = "${stream.user_id}"`, function(err) {
+            if(err) {
+                logger.error(err);
+            }
+        });
+    });
 }
 
 function getImageUrl(url) {

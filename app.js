@@ -12,17 +12,13 @@ const request = require('request');
 // Functions
 const vip = require('./functions/vipProgress.js');
 const addToVips = require('./functions/addToVips.js');
-const checkOfflineUsers = require('./functions/checkOfflineUsers.js');
-const checkOnlineUsers = require('./functions/checkOnlineUsers.js');
-
-// Functions
-const vip = require('./functions/vipProgress.js');
-const addToVips = require('./functions/addToVips.js');
+const checkTwitchUsers = require('./functions/checkTwitchUsers.js');
 
 // Events
 const OnMemberJoin = require('./events/OnMemberJoin');
 const OnMemberLeave = require('./events/OnMemberLeave');
 const OnNewTweet = require('./events/OnNewTweet');
+const OnNewInteraction = require('./events/OnInteraction');
 
 const discordClient = new Client();
 discordClient.commands = new Discord.Collection();
@@ -47,14 +43,13 @@ logger.info(`${package.name} v${package.version}`, 'app');
 
 logger.on('error', function(err) {
     discordClient.users.fetch('190612480958005248').then(user => {
-        user.send('```js' + err + '```').then(msg => {
+        user.send('```js\n' + err + '```').then(msg => {
             process.exit();
         })
     })
 });
 
-// Saves the log at 11:59pm
-clock.on('23:59', function (date) {
+clock.on('23:59', () => {
     logger.save();
 });
 
@@ -81,7 +76,6 @@ discordClient.once('disconnect', () => {
 
 discordClient.once('ready', () => {
     logger.info('Online and connected to Discord');
-
     //discordClient.user.setPresence({ activities: [{ name: `Beta v${package.version}` }], status: 'online' });
     discordClient.guilds.fetch(config.discord.guildID).then((g) => {
         g.commands.set(discordClient.commands);
@@ -110,20 +104,7 @@ discordClient.on('messageUpdate', (oldMessage, newMessage) => {
 // Handle interactions
 discordClient.on('interactionCreate', async interaction => {
     logger.info(`Received interaction: '${interaction.id}' from '${interaction.member.displayName}'`);
-    const command = discordClient.commands.get(interaction.commandName.toLowerCase());
-
-    try {
-        command.execute(logger, interaction, discordClient); 
-        logger.info(`Ran command: '${command.name}' from '${interaction.member.displayName}'`);
-        
-    } catch(err) {
-        logger.warn(`Unknown command: '${interaction.id}' from '${message.author.username}' (${interaction.guild.name})`);
-        logger.error(err);
-        interaction.followUp({
-            content: ':x: `' + err + '`',
-            ephemeral: true
-        });
-    }
+    OnNewInteraction(logger, interaction, discordClient);
 });
 
 // Member Update
@@ -131,15 +112,15 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
     try {
         if (!oldMember.premiumSince && newMember.premiumSince) {
             discordClient.channels.fetch(config.discord.vip_ch).then((channel) => {
-                addToVips(newMember, channel, 90);
+                addToVips(logger, newMember, channel, 90);
             });
         }
     
         if(!oldMember.roles.cache.find(r => r.name === "Streamers") && newMember.roles.cache.find(r => r.name === "Streamers")) {
             Twitch.users.getByLogin(newMember.user.username).then((user) => {
-                console.log(user);
+                logger.info(`Searching Twitch for: '${user.display_name}'`);
                 if(user != undefined && user.id != undefined && user.display_name != null) {
-                    db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online")`, (err) => {
+                    db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online", 0, null)`, (err) => {
                         if(err){
                             logger.warn(err);
                         }
@@ -149,7 +130,7 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
                     });
                 }
                 else {
-                    logger.error(`Could not find a Twitch account called ${newMember.user.username}`);
+                    logger.warn(`Could not find a Twitch account called ${newMember.user.username}`);
                 }
             });
         }
@@ -174,7 +155,7 @@ discordClient.on('guildMemberRemove', member => {
 clock.on('*-*-* 00:00', function (rawDate) {
     var date = FormatDate(rawDate);
 
-    logger.info(`Checking VIPs for today`)
+    logger.info(`Checking VIPs for today`);
     discordClient.guilds.fetch(config.discord.guildID).then((guild) => {
         db.serialize(() => {
             db.all(`SELECT * FROM vips WHERE expireDate = "${date}"`, (err, rows) => {
@@ -205,23 +186,59 @@ clock.on('*-*-* 00:00', function (rawDate) {
                                         logger.info(`Reset '${member.displayName}' (${member.user.id}) VIP progress`)
                                     }
                                 });
-                            })
+                            });
                         });
                     });
                 }
             });
-
-            // db.run(`UPDATE users SET vipProgress = 0`, function(err) {
-            //     if(err) {
-            //         logger.error(err, "vipProgress");
-            //     }
-            //     else {
-            //         logger.info(`Reset all users VIP progress`, 'app')
-            //     }
-            // });
         });
     });
 });
+
+clock.on('*-*-01 00:00', function (rawDate) {
+    let messages = [];
+    let month = GetMonth(-1);
+    let vipAmount = 0;
+    
+    db.serialize(() => {
+        db.all(`SELECT * FROM users WHERE vipProgress >= 8`, (err, rows) => {
+            rows.forEach((row) => {
+                console.log(row);
+                messages.push(row.vipProgress);
+                db.run(`INSERT INTO messageHistory VALUES("${month}", "${row.discordID}", "${row.username}", "${row.vipProgress}", "${row.totalMessages}")`, function(err) {
+                    if(err) {
+                        logger.error(err, "vipProgress");
+                    }
+                    else {
+                        logger.info(`Added '${row.username}' to messageHistory`);
+                        console.log(messages);
+                    }
+                });
+            });
+
+            vipAmount = findAverage(messages);
+            console.log(vipAmount);
+            db.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount}`, function(err) {
+                if(err) {
+                    logger.error(err, "vipProgress");
+                }
+                else {
+                    logger.info(`Reset all users VIP progress`);
+                }
+            });
+        });
+    })
+});
+
+function findAverage(array) {
+    let total = 0;
+    array.forEach((a) => {
+        let value = parseInt(a);
+        total = total + value;
+    });
+
+    return Math.round((total / array.length));
+}
 
 function FormatDate(date)
 {
@@ -231,6 +248,36 @@ function FormatDate(date)
     var year = d.getFullYear();
     return year + '-' + month + '-' + day;
 }
+
+function GetMonth(offset) {
+    let months = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+    var d = new Date(Date.now());
+    let index = d.getMonth() + offset;
+
+    if(index < 0) {
+        index = 12
+    }
+    else if(index > 12) {
+        index = 0
+    }
+
+    console.log(index);
+
+    return `${months[index]} ${d.getFullYear()}`;
+}
+
+// function GetTime()
+// {
+//     var time = new Date();
+//     hours = ("0" + time.getHours()).slice(-2);
+//     var minutes = new Date().getMinutes();
+//     minutes = ("0" + time.getMinutes()).slice(-2);
+//     var seconds = new Date().getSeconds();
+//     seconds = ("0" + time.getSeconds()).slice(-2);
+//     return hours + ":" + minutes + ":" + seconds
+// }
 
 
 //
@@ -302,7 +349,6 @@ function getTwitchToken() {
     });
 }
 
-setInterval(async function() {
-    await checkOfflineUsers(logger, discordClient);
-    await checkOnlineUsers(logger);
-}, 10000);
+clock.on('*:*', function(rawTime) {
+    checkTwitchUsers(logger, discordClient, rawTime);
+});
