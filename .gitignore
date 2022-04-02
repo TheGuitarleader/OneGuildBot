@@ -2,3 +2,4 @@ logs
 config.json
 data.db
 textfiles
+*.txt

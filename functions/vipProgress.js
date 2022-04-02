@@ -36,16 +36,16 @@ module.exports = function(logger, message, value) {
                             }
                         }
                         else {
-                            logger.warn(`Ignoring '${member.displayName}' because they are already a VIP!`, 'vipProgress');
+                            logger.warn(`Ignoring '${member.displayName}' because they are already a VIP!`);
                         }
                     });
                 }
                 else {
-                    logger.warn(`Ignoring '${member.displayName}' because they are either a 'Guild Manager' or 'Guild Member'`, 'vipProgress');
+                    logger.warn(`Ignoring '${member.displayName}' because they are either a 'Guild Manager' or 'Guild Member'`);
                 }
             }
             else {
-                logger.warn(`Ignoring message in live channel`, 'vipProgress');
+                logger.warn(`Ignoring message in live channel`);
             }
         });
     })

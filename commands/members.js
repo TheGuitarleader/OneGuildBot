@@ -15,6 +15,11 @@ module.exports = {
           required: true
         }
     ],
+    /**
+     * @param {KaiLogs.Logger} logger
+     * @param {Discord.Interaction} interaction 
+     * @param {Discord.Client} client 
+     */
     async execute(logger, interaction, client) {
         if(config.discord.ownerIDs.includes(interaction.member.id)) {
             var members = [];

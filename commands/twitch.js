@@ -56,7 +56,7 @@ module.exports = {
                 await Twitch.users.getByLogin(interaction.options.get('twitch_name').value).then((user) => {
                     if(user != undefined && user.id != undefined && user.display_name != undefined) {
                         db.serialize(() => {
-                            db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${getChannelID(interaction.options.getChannel('channel'))}", "${interaction.options.getUser('user').id}", "${interaction.options.getUser('user').username}", "online")`, (err) => {
+                            db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${getChannelID(interaction.options.getChannel('channel'))}", "${interaction.options.getUser('user').id}", "${interaction.options.getUser('user').username}", "online", 0, null)`, (err) => {
                                 if(err){
                                     logger.warn(err);
                                     interaction.reply({

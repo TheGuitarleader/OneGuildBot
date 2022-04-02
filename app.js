@@ -49,8 +49,7 @@ logger.on('error', function(err) {
     })
 });
 
-// Saves the log at 11:59pm
-clock.on('23:59', function (date) {
+clock.on('23:59', () => {
     logger.save();
 });
 
@@ -113,7 +112,7 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
     try {
         if (!oldMember.premiumSince && newMember.premiumSince) {
             discordClient.channels.fetch(config.discord.vip_ch).then((channel) => {
-                addToVips(newMember, channel, 90);
+                addToVips(logger, newMember, channel, 90);
             });
         }
     
@@ -121,7 +120,7 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
             Twitch.users.getByLogin(newMember.user.username).then((user) => {
                 logger.info(`Searching Twitch for: '${user.display_name}'`);
                 if(user != undefined && user.id != undefined && user.display_name != null) {
-                    db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online")`, (err) => {
+                    db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online", 0, null)`, (err) => {
                         if(err){
                             logger.warn(err);
                         }
@@ -156,7 +155,7 @@ discordClient.on('guildMemberRemove', member => {
 clock.on('*-*-* 00:00', function (rawDate) {
     var date = FormatDate(rawDate);
 
-    logger.info(`Checking VIPs for today`)
+    logger.info(`Checking VIPs for today`);
     discordClient.guilds.fetch(config.discord.guildID).then((guild) => {
         db.serialize(() => {
             db.all(`SELECT * FROM vips WHERE expireDate = "${date}"`, (err, rows) => {
@@ -187,23 +186,59 @@ clock.on('*-*-* 00:00', function (rawDate) {
                                         logger.info(`Reset '${member.displayName}' (${member.user.id}) VIP progress`)
                                     }
                                 });
-                            })
+                            });
                         });
                     });
                 }
             });
-
-            // db.run(`UPDATE users SET vipProgress = 0`, function(err) {
-            //     if(err) {
-            //         logger.error(err, "vipProgress");
-            //     }
-            //     else {
-            //         logger.info(`Reset all users VIP progress`, 'app')
-            //     }
-            // });
         });
     });
 });
+
+clock.on('*-*-01 00:00', function (rawDate) {
+    let messages = [];
+    let month = GetMonth(-1);
+    let vipAmount = 0;
+    
+    db.serialize(() => {
+        db.all(`SELECT * FROM users WHERE vipProgress >= 8`, (err, rows) => {
+            rows.forEach((row) => {
+                console.log(row);
+                messages.push(row.vipProgress);
+                db.run(`INSERT INTO messageHistory VALUES("${month}", "${row.discordID}", "${row.username}", "${row.vipProgress}", "${row.totalMessages}")`, function(err) {
+                    if(err) {
+                        logger.error(err, "vipProgress");
+                    }
+                    else {
+                        logger.info(`Added '${row.username}' to messageHistory`);
+                        console.log(messages);
+                    }
+                });
+            });
+
+            vipAmount = findAverage(messages);
+            console.log(vipAmount);
+            db.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount}`, function(err) {
+                if(err) {
+                    logger.error(err, "vipProgress");
+                }
+                else {
+                    logger.info(`Reset all users VIP progress`);
+                }
+            });
+        });
+    })
+});
+
+function findAverage(array) {
+    let total = 0;
+    array.forEach((a) => {
+        let value = parseInt(a);
+        total = total + value;
+    });
+
+    return Math.round((total / array.length));
+}
 
 function FormatDate(date)
 {
@@ -212,6 +247,25 @@ function FormatDate(date)
     var day = d.getDate();
     var year = d.getFullYear();
     return year + '-' + month + '-' + day;
+}
+
+function GetMonth(offset) {
+    let months = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+    var d = new Date(Date.now());
+    let index = d.getMonth() + offset;
+
+    if(index < 0) {
+        index = 12
+    }
+    else if(index > 12) {
+        index = 0
+    }
+
+    console.log(index);
+
+    return `${months[index]} ${d.getFullYear()}`;
 }
 
 // function GetTime()

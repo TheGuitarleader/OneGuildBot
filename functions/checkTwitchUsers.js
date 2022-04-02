@@ -15,7 +15,7 @@ module.exports = function(logger, client, time) {
             });
         
             var url = format.slice(0, -1);
-            let newTime = new Date(time.setTime(time.getTime() + 7200000));
+            let newTime = new Date(time.setTime(time.getTime() + 1440000));
         
             request.get(url, {
                 'headers': {
@@ -55,12 +55,16 @@ module.exports = function(logger, client, time) {
                                     });
                                 }
                                 else if(row.status == "online") {
-                                    findOfflineStreams(logger, stream_ids);
+                                    findOfflineStreams(logger, stream_ids, client);
                                     if(row.eventID != null) {
                                         guild.scheduledEvents.fetch(row.eventID).then((guildEvent) => {
-                                            guildEvent.edit({
-                                                name: stream.title
-                                            });
+                                            if(time.getTime() < guildEvent.scheduledEndTimestamp) {
+                                                console.log(guildEvent);
+                                                guildEvent.edit({
+                                                    name: stream.title,
+                                                    scheduledEndTimestamp: time.getTime() + 120000
+                                                });
+                                            }
                                         });
                                     }
                                 }
@@ -109,7 +113,7 @@ const getOnlineUsers = () => {
 };
 
 
-function findOfflineStreams(logger, streamsArray) {
+function findOfflineStreams(logger, streamsArray, client) {
     getOnlineUsers().then((userArray) => {
         var userArraySize = userArray.length;
  
@@ -118,11 +122,13 @@ function findOfflineStreams(logger, streamsArray) {
                db.serialize(() => {
                    db.get(`SELECT * FROM twitchAccounts WHERE twitchID = "${userArray[i]}"`, (err, row) => {
                        logger.info(`User ${row.twitchName} is now offline`);
-                       client.guilds.fetch(config.discord.guildID).then((guild) => {
-                           guild.scheduledEvents.fetch(row.eventID).then((guildEvent) => {
-                               guildEvent.delete();
+                       if(row.eventID != null) {
+                           client.guilds.fetch(config.discord.guildID).then((guild) => {
+                               guild.scheduledEvents.fetch(row.eventID).then((guildEvent) => {
+                                   guildEvent.delete();
+                               })
                            });
-                       });
+                       }
                    });
                 
                    db.run(`UPDATE twitchAccounts SET status = "offline", eventID = null WHERE twitchID = "${userArray[i]}"`, function(err) {

@@ -2,6 +2,14 @@ const Discord = require('discord.js');
 const KaiLogs = require('kailogs');
 const config = require('../config.json');
 
+const diceRoll = require('../functions/diceRoll');
+
+/**
+ * 
+ * @param {KaiLogs.Logger} logger 
+ * @param {Discord.Interaction} interaction 
+ * @param {Discord.Client} client 
+ */
 module.exports = function OnInteraction(logger, interaction, client) {
     if(interaction.isCommand()) {
         const command = client.commands.get(interaction.commandName.toLowerCase());
@@ -13,27 +21,16 @@ module.exports = function OnInteraction(logger, interaction, client) {
         const guild = interaction.guild;
 
         if(interaction.customId == 'trash') {
-            logger.warn('Code not added yet!');
+            //logger.warn('Code not added yet!');
+            
+            // interaction.message.delete();
+            // interaction.reply({
+            //     content: ':thumbsup:',
+            //     ephemeral: true
+            // });
         }
         else if(interaction.customId == 'rolldice') {
-            let rndInt = formatCommas(getRndInt(6));
-            console.log(rndInt);
-
-            const embed = new Discord.MessageEmbed()
-            .setColor(config.discord.embedHex)
-            .setTitle(`:game_die: ${interaction.member.displayName} rolled a ${rndInt}! :game_die:`)
-    
-            // const row = new Discord.MessageActionRow()
-            // .addComponents(
-            //     new Discord.MessageButton()
-            //     .setCustomId('trash')
-            //     .setStyle('SECONDARY')
-            //     .setEmoji('🗑')
-            // )
-    
-            interaction.reply({
-                embeds: [embed]
-            });
+            diceRoll(logger, interaction);
         }
     }
 }

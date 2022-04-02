@@ -1,5 +1,8 @@
 const Discord = require('discord.js');
+const KaiLogs = require('kailogs');
 const config = require('../config.json');
+const sqlite = require('sqlite3').verbose();
+let db = new sqlite.Database('./data.db');
 
 module.exports = {
     name: "rolldice",
@@ -17,6 +20,11 @@ module.exports = {
      * @param {Discord.Client} client 
      */
     async execute(logger, interaction, client) {
+        db.run(`UPDATE diceRollPoints SET points = 0`, function(err) {
+            if(err) {
+                logger.error(err);
+            }
+        });
 
         const embed = new Discord.MessageEmbed()
         .setColor(config.discord.embedHex)
