@@ -7,15 +7,17 @@ const addToVips = require('../functions/addToVips.js');
 
 module.exports = function(logger, message, value) {
     db.serialize(() => {
+
+        // User
         db.run(`INSERT OR IGNORE INTO users VALUES("${message.author.id}", "${message.author.username}", "false", 0, 300, 0)`, (err) => {
             if(err) {
-                logger.error(err);
+                logger.warn(err);
             }
         });
 
         db.run(`UPDATE users SET vipProgress = vipProgress + 1, totalMessages = totalMessages + 1 WHERE discordID = "${message.author.id}"`, function(err) {
             if(err) {
-                logger.error(err);
+                logger.warn(err);
             }
             else {
                 //logger.info(`Updated messages count for '${message.author.username}'`);
@@ -35,17 +37,33 @@ module.exports = function(logger, message, value) {
                                 addToVips(logger, member, message.channel, 30);
                             }
                         }
-                        else {
-                            logger.warn(`Ignoring '${member.displayName}' because they are already a VIP!`);
+                        else if(config.debugMode) {
+                            logger.debug(`Ignoring '${member.displayName}' because they are already a VIP!`);
                         }
                     });
                 }
-                else {
-                    logger.warn(`Ignoring '${member.displayName}' because they are either a 'Guild Manager' or 'Guild Member'`);
+                else if(config.debugMode) {
+                    logger.debug(`Ignoring '${member.displayName}' because they are either a 'Guild Manager' or 'Guild Member'`);
                 }
             }
-            else {
-                logger.warn(`Ignoring message in live channel`);
+            else if(config.debugMode) {
+                logger.debug(`Ignoring message in live channel`);
+            }
+        });
+
+        // Channel
+        db.run(`INSERT OR IGNORE INTO channels VALUES("${message.channel.id}", "${message.channel.name}", 0, 0)`, (err) => {
+            if(err) {
+                logger.warn(err);
+            }
+        });
+
+        db.run(`UPDATE channels SET daily = daily + 1, monthly = monthly + 1 WHERE id = "${message.channel.id}"`, function(err) {
+            if(err) {
+                logger.warn(err);
+            }
+            else if(config.debugMode) {
+                logger.debug('Updated channel count.')
             }
         });
     })

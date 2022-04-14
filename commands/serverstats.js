@@ -7,67 +7,96 @@ let db = new sqlite.Database('./data.db');
 
 module.exports = {
     name: "stats",
-    description: "List of top 10 messages sent",
+    description: "Server statistics",
+    options: [
+        {
+          name: 'type',
+          type: 3,
+          description: 'The type of action',
+          required: true,
+          choices: [
+            {
+                name: 'Message Stats',
+                value: 'message'
+            },
+            {
+                name: 'Channel Stats',
+                value: 'channel'
+            }
+          ]
+        }
+    ],
     /**
      * @param {KaiLogs.Logger} logger 
      * @param {Discord.Interaction} interaction 
      * @param {Discord.Client} client 
      */
     async execute(logger, interaction, client) {
-        db.all(`SELECT * FROM users ORDER BY vipProgress DESC`, (err, rows1) => {
+        if(config.discord.ownerIDs.includes(interaction.member.id)) {
+            const type = interaction.options.get('type').value;
+            if(type == 'message') {
+                db.all(`SELECT * FROM users ORDER BY vipProgress DESC`, (err, rows1) => {
 
-            let allUsers = [];
-            let activeUsers = [];
-            let totalMessages = 0;
-            let monthMessages = 0;
-            let activeMessages = 0;
-            let prevMonthAmounts = [];
-            let prevMonthTotal = 0;
-
-            if(rows1 != undefined) {
-                rows1.forEach((row) => {
-                    allUsers.push(row);
-                    totalMessages = totalMessages + row.totalMessages;
-                    if(row.vipProgress >= 8) {
-                        activeUsers.push(row.vipProgress);
-                        activeMessages = activeMessages + row.totalMessages;
-                        monthMessages = monthMessages + row.vipProgress;
-                    }
-                });
-
-                db.all(`SELECT * FROM messageHistory WHERE month = "${GetMonth(-1)}"`, (err, rows2) => {
-                    console.log(rows2);
-                    if(rows2 != null) {
-                        rows2.forEach((row) => {
-                            prevMonthAmounts.push(row.amount);
-                            prevMonthTotal = prevMonthTotal + row.amount;
+                    let allUsers = [];
+                    let activeUsers = [];
+                    let totalMessages = 0;
+                    let monthMessages = 0;
+                    let activeMessages = 0;
+                    let prevMonthAmounts = [];
+                    let prevMonthTotal = 0;
+        
+                    if(rows1 != undefined) {
+                        rows1.forEach((row) => {
+                            allUsers.push(row);
+                            totalMessages = totalMessages + row.totalMessages;
+                            if(row.vipProgress >= 8) {
+                                activeUsers.push(row.vipProgress);
+                                activeMessages = activeMessages + row.totalMessages;
+                                monthMessages = monthMessages + row.vipProgress;
+                            }
                         });
-    
-                        client.guilds.fetch(config.discord.guildID).then((guild) => {
-                            const embed = new Discord.MessageEmbed()
-                            .setColor(config.discord.embedHex)
-                            .setTitle(":earth_americas:  Server Message Stats")
-                            .setDescription('Stats are calculated off of member activity. Activity \nis calculated off of if the member has sent more \nthen 2 messages a week in the month.')
-                            .addFields(
-                                { name: ':wave: Active Members:', value: `Active: ${formatCommas(activeUsers.length)}, Total: ${formatCommas(guild.memberCount)} (${findPercents(activeUsers.length, guild.memberCount)})`},
-                                { name: ':pencil: Total Messages:', value: `Active: ${formatCommas(activeMessages)}, Total: ${formatCommas(totalMessages)} (${findPercents(activeMessages, totalMessages)})`},
-                                { name: ':incoming_envelope: Average Messages Sent:', value: `This month: ${findAverage(activeUsers)}, Last month: ${findAverage(prevMonthAmounts)} (${findPercentChange(findAverage(prevMonthAmounts), findAverage(activeUsers))})`},
-                                { name: ':envelope: Monthly Messages Sent:', value: `This month: ${formatCommas(monthMessages)}, Last month: ${formatCommas(prevMonthTotal)} (${findPercentChange(prevMonthTotal, monthMessages)})`},
-                                { name: `:first_place: : ${allUsers[0].username}`, value: `Messages: ${allUsers[0].vipProgress} (${findPercents(allUsers[0].vipProgress, activeMessages)})`},
-                                { name: `:second_place: : ${allUsers[1].username}`, value: `Messages: ${allUsers[1].vipProgress} (${findPercents(allUsers[1].vipProgress, activeMessages)})`},
-                                { name: `:third_place: : ${allUsers[2].username}`, value: `Messages: ${allUsers[2].vipProgress} (${findPercents(allUsers[2].vipProgress, activeMessages)})`},
-                            )
-                            .setFooter({ text: guild.name, iconURL: guild.iconURL() });
-                            
-                            logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
-                            interaction.reply({
-                                embeds: [embed]
-                            });
+        
+                        db.all(`SELECT * FROM messageHistory WHERE month = "${GetMonth(-1)}"`, (err, rows2) => {
+                            console.log(rows2);
+                            if(rows2 != null) {
+                                rows2.forEach((row) => {
+                                    prevMonthAmounts.push(row.amount);
+                                    prevMonthTotal = prevMonthTotal + row.amount;
+                                });
+            
+                                client.guilds.fetch(config.discord.guildID).then((guild) => {
+                                    const embed = new Discord.MessageEmbed()
+                                    .setColor(config.discord.embedHex)
+                                    .setTitle(":earth_americas:  Server Message Stats")
+                                    .setDescription('Stats are calculated off of member activity. Activity \nis calculated off of if the member has sent more \nthen 2 messages a week in the month.')
+                                    .addFields(
+                                        { name: ':wave: Active Members:', value: `Active: ${formatCommas(activeUsers.length)}, Total: ${formatCommas(guild.memberCount)} (${findPercents(activeUsers.length, guild.memberCount)})`},
+                                        { name: ':pencil: Total Messages:', value: `Active: ${formatCommas(activeMessages)}, Total: ${formatCommas(totalMessages)} (${findPercents(activeMessages, totalMessages)})`},
+                                        { name: ':incoming_envelope: Average Messages Sent:', value: `This month: ${findAverage(activeUsers)}, Last month: ${findAverage(prevMonthAmounts)} (${findPercentChange(findAverage(prevMonthAmounts), findAverage(activeUsers))})`},
+                                        { name: ':envelope: Monthly Messages Sent:', value: `This month: ${formatCommas(monthMessages)}, Last month: ${formatCommas(prevMonthTotal)} (${findPercentChange(prevMonthTotal, monthMessages)})`},
+                                        { name: `:first_place: : ${allUsers[0].username}`, value: `Messages: ${allUsers[0].vipProgress} (${findPercents(allUsers[0].vipProgress, activeMessages)})`},
+                                        { name: `:second_place: : ${allUsers[1].username}`, value: `Messages: ${allUsers[1].vipProgress} (${findPercents(allUsers[1].vipProgress, activeMessages)})`},
+                                        { name: `:third_place: : ${allUsers[2].username}`, value: `Messages: ${allUsers[2].vipProgress} (${findPercents(allUsers[2].vipProgress, activeMessages)})`},
+                                    )
+                                    .setFooter({ text: guild.name, iconURL: guild.iconURL() });
+                                    
+                                    logger.info(`Showed ${this.name} for user '${interaction.member.displayName}' (${interaction.member.id})`);
+                                    interaction.reply({
+                                        embeds: [embed]
+                                    });
+                                });
+                            }
                         });
                     }
                 });
             }
-        });
+            else if((type == 'channel')) {
+                interaction.reply({
+                    content: "**Feature still in development!**",
+                    ephemeral: true
+                });
+            }
+        }
     }
 }
 
