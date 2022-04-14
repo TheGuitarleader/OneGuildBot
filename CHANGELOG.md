@@ -1,10 +1,21 @@
 # CHANGELOG
 
+## v0.9.0 / 2022-04-14
+
+Major changes:
+- New debug mode. Helps debug new features and cleans garbage out of logs.
+- `stats` now has parameters, `message` shows message stats (Old) and `channel` shows the stats of each channel.
+- `stats` is also now locked to only admins.
+
+Minor changes:
+- Changed embed formats for some admin commands.
+- Fixed issues with live post cooldowns.
+
 ## v0.8.0 / 2022-03-22
 
 Major changes:
 - VIP threshold now dynamically changes based off previous values. Making it easier to hit VIP.
-- New `serverstats` command for admins. Shows server performance.
+- New `stats` command for admins. Shows server performance.
 - `announce` command is now `embed`. Added more customization features.
 - New `giveaway` command for admins. Picks random user that meets a 'active' requirement.
 
@@ -17,12 +28,12 @@ Minor changes:
 ## v0.7.0 / 2022-03-10
 
 Major changes:
-- Overhaulled live post system. New system is now more efficent
+- Overhauled live post system. New system is now more efficient
 - New `announce` command. Say something as the bot.  (Use a semicolon `;` to add a line break.)
 - New `rolldice` command. Roll some dice with your friends!
 
 Minor changes:
-- Changed formating for errors and changelog.
+- Changed formatting for errors and changelog.
 - Now removes remove member from database when they leave the server.
 
 Bug Fixes:

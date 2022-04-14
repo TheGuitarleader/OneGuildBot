@@ -11,7 +11,7 @@
     "twit": "^2.2.11"
   },
   "name": "onesiebot",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "a discord bot",
   "main": "app.js",
   "scripts": {

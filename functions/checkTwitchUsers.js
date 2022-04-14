@@ -15,7 +15,7 @@ module.exports = function(logger, client, time) {
             });
         
             var url = format.slice(0, -1);
-            let newTime = new Date(time.setTime(time.getTime() + 1440000));
+            let newTime = time.getTime() + 14400000;
         
             request.get(url, {
                 'headers': {
@@ -36,13 +36,17 @@ module.exports = function(logger, client, time) {
 
                     client.guilds.fetch(config.discord.guildID).then((guild) => {
                         streams.forEach((stream) => {
+                            console.log(stream);
                             db.get(`SELECT * FROM twitchAccounts WHERE twitchID = "${stream.user_id}"`, (err, row) => {
                                 if(err) {
                                     logger.error(err);
                                 }
-                                else if(row.status == "offline" && time >= row.cooldown) {
+                                else if(row.status == "offline" && time.getTime() >= row.cooldown) {
+                                    console.log(time.getTime());
+                                    console.log(row.cooldown);
+
                                     guild.members.fetch(row.discordID).then((member) => {
-                                        db.run(`UPDATE twitchAccounts SET twitchName = "${stream.user_name}", discordName = "${member.displayName}", status = "online", cooldown = "${newTime.getTime()}" WHERE twitchID = "${stream.user_id}"`, function(err) {
+                                        db.run(`UPDATE twitchAccounts SET twitchName = "${stream.user_name}", discordName = "${member.displayName}", status = "online", cooldown = "${newTime}" WHERE twitchID = "${stream.user_id}"`, function(err) {
                                             if(err) {
                                                 logger.error(err);
                                             }

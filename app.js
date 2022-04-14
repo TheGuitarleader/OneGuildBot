@@ -39,23 +39,26 @@ const KaiLogs = require('kailogs');
 const logger = new KaiLogs.logger('./logs');
 new KaiLogs.exceptions(logger).handle();
 new KaiLogs.rejections(logger).handle();
-logger.info(`${package.name} v${package.version}`, 'app');
+logger.info(`${package.name} v${package.version}`);
 
 logger.on('error', function(err) {
     discordClient.users.fetch('190612480958005248').then(user => {
         user.send('```js\n' + err + '```').then(msg => {
-            process.exit();
+            process.exit(1);
         })
-    })
+    });
 });
 
 clock.on('23:59', () => {
     logger.save();
 });
 
-// discordClient.on('debug', debug => {
-//     logger.log(debug, 'DEBUG', 'discord');
-// });
+if(config.debugMode) {
+    logger.debug('---STARTING IN DEBUG MODE!---');
+    discordClient.on('debug', debug => {
+        logger.log(debug, 'DEBUG', 'discord');
+    });
+}
 
 discordClient.on('error', error => {
     logger.log(error, 'ERROR', 'discord');
@@ -76,11 +79,14 @@ discordClient.once('disconnect', () => {
 
 discordClient.once('ready', () => {
     logger.info('Online and connected to Discord');
-    //discordClient.user.setPresence({ activities: [{ name: `Beta v${package.version}` }], status: 'online' });
     discordClient.guilds.fetch(config.discord.guildID).then((g) => {
         g.commands.set(discordClient.commands);
         logger.info(`Updated slash commands for guild: '${g.name}' (${g.id})`);
     });
+
+    if(config.debugMode) {
+        discordClient.user.setPresence({ activities: [{ name: `v${package.version}`, type:'WATCHING' }], status: 'dnd' });
+    }
 });
 
 
@@ -191,6 +197,37 @@ clock.on('*-*-* 00:00', function (rawDate) {
                     });
                 }
             });
+
+            db.all(`SELECT * FROM channels ORDER BY daily DESC`, (err, rows) => {
+                let dailyMessages = 0;
+                let dailyString = "";
+
+                if(rows != null && rows != undefined) {
+                    rows.forEach(row => {
+                        dailyMessages = dailyMessages + parseInt(row.daily);
+                        dailyString += `${row.name}: ${formatCommas(row.daily)}\n`
+                    });
+
+                    const embed = new Discord.MessageEmbed()
+                    .setColor(config.discord.embedHex)
+                    .setTitle(`Counts for ${FormatDate(Date.now())}`)
+                    .setDescription(`${dailyString}\nTotal today: ${formatCommas(dailyMessages)}`)
+                    .setFooter({ text: guild.name, iconURL: guild.iconURL() });
+
+                    discordClient.channels.fetch(config.discord.post_ch).then((channel) => {
+                        channel.send({embeds: [embed]});
+                    });
+                }
+            });
+
+            db.run(`UPDATE channels SET daily = 0`, function(err) {
+                if(err) {
+                    logger.warn(err);
+                }
+                else {
+                    logger.info(`Reset all channels daily count.`);
+                }
+            });
         });
     });
 });
@@ -207,7 +244,7 @@ clock.on('*-*-01 00:00', function (rawDate) {
                 messages.push(row.vipProgress);
                 db.run(`INSERT INTO messageHistory VALUES("${month}", "${row.discordID}", "${row.username}", "${row.vipProgress}", "${row.totalMessages}")`, function(err) {
                     if(err) {
-                        logger.error(err, "vipProgress");
+                        logger.warn(err);
                     }
                     else {
                         logger.info(`Added '${row.username}' to messageHistory`);
@@ -218,12 +255,21 @@ clock.on('*-*-01 00:00', function (rawDate) {
 
             vipAmount = findAverage(messages);
             console.log(vipAmount);
-            db.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount}`, function(err) {
+            db.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount} WHERE isVIP = "false"`, function(err) {
                 if(err) {
-                    logger.error(err, "vipProgress");
+                    logger.warn(err);
                 }
                 else {
                     logger.info(`Reset all users VIP progress`);
+                }
+            });
+
+            db.run(`UPDATE channels SET monthly = 0`, function(err) {
+                if(err) {
+                    logger.warn(err);
+                }
+                else {
+                    logger.info(`Reset all channels monthly count.`);
                 }
             });
         });
@@ -238,6 +284,10 @@ function findAverage(array) {
     });
 
     return Math.round((total / array.length));
+}
+
+function formatCommas(number) {
+    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 function FormatDate(date)
@@ -323,7 +373,7 @@ getTwitterUsers().then((users) => {
 
     tweetStream.on('tweet', function(tweet) {
         OnNewTweet(logger, tweet, discordClient, db, users);
-    })
+    });
 });
 
 //
