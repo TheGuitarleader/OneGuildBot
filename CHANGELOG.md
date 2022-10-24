@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v0.10.0 / 2022-10-24
+
+Major changes:
+- New nowlive command. See who is all currently live in the OneGuild.
+
+Minor changes:
+- New going live message sending system.
+- Backed up source code to private server.
+
+Bug fixes:
+- Twitter API returning undefined when attempting to forward tweets. (#31)
+- Stream titles over 100 characters not displaying as guild events. (#16)
+
 ## v0.9.0 / 2022-04-14
 
 Major changes:
