@@ -42,12 +42,15 @@ new KaiLogs.rejections(logger).handle();
 logger.info(`${package.name} v${package.version}`);
 
 logger.on('error', function(err) {
+    setTimeout(_gracefulExit, 2000);
     discordClient.users.fetch('190612480958005248').then(user => {
-        user.send('```js\n' + err + '```').then(msg => {
-            process.exit(1);
-        })
+        user.send('```js\n' + err + '```');
     });
 });
+
+function _gracefulExit() {
+    process.exit(1);
+}
 
 clock.on('23:59', () => {
     logger.save();
@@ -86,6 +89,7 @@ discordClient.once('ready', () => {
 
     if(config.debugMode) {
         discordClient.user.setPresence({ activities: [{ name: `v${package.version}`, type:'WATCHING' }], status: 'dnd' });
+        checkTwitchUsers(logger, discordClient, new Date(Date.now()));
     }
 });
 
@@ -118,28 +122,46 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
     try {
         if (!oldMember.premiumSince && newMember.premiumSince) {
             discordClient.channels.fetch(config.discord.vip_ch).then((channel) => {
-                addToVips(logger, newMember, channel, 90);
-            });
-        }
-    
-        if(!oldMember.roles.cache.find(r => r.name === "Streamers") && newMember.roles.cache.find(r => r.name === "Streamers")) {
-            Twitch.users.getByLogin(newMember.user.username).then((user) => {
-                logger.info(`Searching Twitch for: '${user.display_name}'`);
-                if(user != undefined && user.id != undefined && user.display_name != null) {
-                    db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online", 0, null)`, (err) => {
-                        if(err){
-                            logger.warn(err);
+                if(!newMember.roles.cache.find(r => r.name === "Guild Leaders") && !newMember.roles.cache.find(r => r.name === "Guild Managers") && !newMember.roles.cache.find(r => r.name === "Guild Members"))
+                {
+                    db.get(`SELECT * FROM users WHERE discordID = "${newMember.user.id}" AND isVIP = "false"`, [], (err, row) => {
+                        if(err) {
+                            logger.error(err);
                         }
-                        else {
-                            logger.info(`Added new Twitch account '${user.display_name}' (${user.id})`);
+                        else if(row != undefined) {
+                            if(row.vipProgress >= row.toVIP) {
+                                addToVips(logger, newMember, channel, 90);
+                            }
+                        }
+                        else if(config.debugMode) {
+                            logger.debug(`Ignoring '${newMember.displayName}' because they are already a VIP!`);
                         }
                     });
                 }
-                else {
-                    logger.warn(`Could not find a Twitch account called ${newMember.user.username}`);
+                else if(config.debugMode) {
+                    logger.debug(`Ignoring '${newMember.displayName}' because they are either a 'Guild Manager' or 'Guild Member'`);
                 }
             });
         }
+    
+        // if(!oldMember.roles.cache.find(r => r.name === "Streamers") && newMember.roles.cache.find(r => r.name === "Streamers")) {
+        //     Twitch.users.getByLogin(newMember.user.username).then((user) => {
+        //         logger.info(`Searching Twitch for: '${user.display_name}'`);
+        //         if(user != undefined && user.id != undefined && user.display_name != null) {
+        //             db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online", 0, null)`, (err) => {
+        //                 if(err){
+        //                     logger.warn(err);
+        //                 }
+        //                 else {
+        //                     logger.info(`Added new Twitch account '${user.display_name}' (${user.id})`);
+        //                 }
+        //             });
+        //         }
+        //         else {
+        //             logger.warn(`Could not find a Twitch account called ${newMember.user.username}`);
+        //         }
+        //     });
+        // }
     } catch (err) {
         logger.error(err);
     };
@@ -201,19 +223,21 @@ clock.on('*-*-* 00:00', function (rawDate) {
             db.all(`SELECT * FROM channels ORDER BY daily DESC`, (err, rows) => {
                 let dailyMessages = 0;
                 let dailyString = "";
-
+        
                 if(rows != null && rows != undefined) {
                     rows.forEach(row => {
-                        dailyMessages = dailyMessages + parseInt(row.daily);
-                        dailyString += `${row.name}: ${formatCommas(row.daily)}\n`
+                        if(row.daily > 0) {
+                            dailyMessages = dailyMessages + parseInt(row.daily);
+                            dailyString += `${row.name}: ${formatCommas(row.daily)}\n`
+                        }
                     });
-
+        
                     const embed = new Discord.MessageEmbed()
                     .setColor(config.discord.embedHex)
                     .setTitle(`Counts for ${FormatDate(Date.now())}`)
-                    .setDescription(`${dailyString}\nTotal today: ${formatCommas(dailyMessages)}`)
+                    .setDescription(`**${dailyString}\nTotal today: ${formatCommas(dailyMessages)}**`)
                     .setFooter({ text: guild.name, iconURL: guild.iconURL() });
-
+        
                     discordClient.channels.fetch(config.discord.post_ch).then((channel) => {
                         channel.send({embeds: [embed]});
                     });
@@ -255,7 +279,7 @@ clock.on('*-*-01 00:00', function (rawDate) {
 
             vipAmount = findAverage(messages);
             console.log(vipAmount);
-            db.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount} WHERE isVIP = "false"`, function(err) {
+            db.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount}`, function(err) {
                 if(err) {
                     logger.warn(err);
                 }
@@ -374,6 +398,15 @@ getTwitterUsers().then((users) => {
     tweetStream.on('tweet', function(tweet) {
         OnNewTweet(logger, tweet, discordClient, db, users);
     });
+
+    clock.on('hour', function (date) {
+        if(config.debugMode) {
+            logger.debug("Refreshing tweet stream...");
+        }
+
+        tweetStream.stop();
+        tweetStream.start();
+    });
 });
 
 //
@@ -401,4 +434,9 @@ function getTwitchToken() {
 
 clock.on('*:*', function(rawTime) {
     checkTwitchUsers(logger, discordClient, rawTime);
+    
+    if(config.debugMode) {
+        console.log(rawTime);
+        logger.info("Requesting Twitch info...");
+    }
 });

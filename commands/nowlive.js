@@ -5,15 +5,15 @@ const sqlite = require('sqlite3').verbose();
 let db = new sqlite.Database('./data.db');
 
 module.exports = {
-    name: "twitch-list",
-    description: "Lists the followed Twitch accounts",
+    name: "nowlive",
+    description: "Lists the live accounts",
     group: 'general',
     async execute(logger, interaction, client) {
-        db.all(`SELECT * FROM twitchAccounts ORDER BY twitchName ASC`, (err, rows) => {
+        db.all(`SELECT * FROM twitchAccounts WHERE status = "online"`, (err, rows) => {
 
             const embed = new Discord.MessageEmbed();
             embed.setColor('#9146FF');
-            embed.setTitle("Currently Following");
+            embed.setTitle("Currently Live Channels");
 
             let twitchData = "";
             rows.forEach((row) => {
@@ -28,13 +28,11 @@ module.exports = {
 }
 
 function getStatusEmote(status) {
-    if(status == 'offline')
-    {
+    if(status == 'offline') {
         let offline = ":white_circle:"
         return offline;
     }
-    else if(status == 'online')
-    {
+    else if(status == 'online') {
         let online = ":red_circle:"
         return online;
     }

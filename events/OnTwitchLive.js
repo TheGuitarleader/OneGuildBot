@@ -10,7 +10,7 @@ const Twitch = new HelixAPI({
     redirect_url: "http://localhost"
 });
 
-module.exports = function OnNowLive(logger, stream, client) {
+module.exports = function OnTwitchLive(logger, stream, client) {
     var guild = client.guilds.cache.get(config.discord.guildID);
     db.get(`SELECT * FROM twitchAccounts WHERE twitchID = ?`, [stream.user_id], (err, user) => {
         if(err) {
@@ -59,6 +59,10 @@ function displayLiveInfo(logger, stream, member, channel, client) {
         }
 
         logger.info(`Forwarding live update from '${stream.user_login}' (${stream.user_id}) to '${channel.name}' (${channel.id}) ->`);
+
+        if(member.roles.cache.find(r => r.id === "1033113741358796951")) {
+
+        }
     });
 };
 
@@ -71,7 +75,7 @@ function createGuildEvent(logger, name, stream, client) {
 
     let description = `Hey everyone, ${name} is live! Please show some One Guild Support!`;
     guild.scheduledEvents.create({
-        name: stream.title,
+        name: formatStreamName(stream.title),
         description: description,
         scheduledStartTime: startDate,
         scheduledEndTime: endDate,
@@ -87,6 +91,17 @@ function createGuildEvent(logger, name, stream, client) {
             }
         });
     });
+}
+
+function formatStreamName(title) {
+    if(title.length > 96) {
+        let newTitle = title.substring(0, 96);
+        newTitle += "...";
+        return newTitle;
+    }
+    else {
+        return title;
+    }
 }
 
 function getImageUrl(url) {
