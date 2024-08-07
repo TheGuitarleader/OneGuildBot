@@ -1,10 +1,7 @@
+const Client = require('../client/client.js');
 const Discord = require('discord.js');
 const config = require('../config.json');
-const addToVips = require('../functions/addToVips');
 const moment = require('moment');
-
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
 
 module.exports = {
     name: "user",
@@ -20,7 +17,7 @@ module.exports = {
     /**
      * @param {KaiLogs.Logger} logger 
      * @param {Discord.Interaction} interaction 
-     * @param {Discord.Client} client 
+     * @param {Client} client 
      */
     async execute(logger, interaction, client) {
         if(config.discord.ownerIDs.includes(interaction.member.id)) {

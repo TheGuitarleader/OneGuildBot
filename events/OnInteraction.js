@@ -1,12 +1,10 @@
 const Discord = require('discord.js');
-const KaiLogs = require('kailogs');
+const Margo = require('margojs');
 const config = require('../config.json');
-
-const diceRoll = require('../functions/diceRoll');
 
 /**
  * 
- * @param {KaiLogs.Logger} logger 
+ * @param {Margo.Logger} logger 
  * @param {Discord.Interaction} interaction 
  * @param {Discord.Client} client 
  */
@@ -16,22 +14,21 @@ module.exports = function OnInteraction(logger, interaction, client) {
         command.execute(logger, interaction, client);
         logger.info(`Ran command: '${command.name}' from '${interaction.member.displayName}'`);
     }
-    else if(interaction.isButton()) {
+    
+    if(interaction.isButton()) {
         logger.info(`Received button: '${interaction.customId}' (${interaction.id}) from '${interaction.member.displayName}'`);
         const guild = interaction.guild;
 
-        if(interaction.customId == 'trash') {
-            //logger.warn('Code not added yet!');
+        // if(interaction.customId == 'trash') {
+        //     //logger.warn('Code not added yet!');
             
-            // interaction.message.delete();
-            // interaction.reply({
-            //     content: ':thumbsup:',
-            //     ephemeral: true
-            // });
-        }
-        else if(interaction.customId == 'rolldice') {
-            diceRoll(logger, interaction);
-        }
+        //     interaction.message.delete().then(msg => {
+        //         interaction.reply({
+        //             content: ':thumbsup:',
+        //             ephemeral: true
+        //         });
+        //     });
+        // }
     }
 }
 

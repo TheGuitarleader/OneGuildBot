@@ -1,15 +1,12 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
 
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
-
 module.exports = {
     name: "nowlive",
     description: "Lists the live accounts",
     group: 'general',
     async execute(logger, interaction, client) {
-        db.all(`SELECT * FROM twitchAccounts WHERE status = "online"`, (err, rows) => {
+        client.db.query(`SELECT * FROM twitch_users WHERE status = "online";`, (err, rows) => {
 
             const embed = new Discord.MessageEmbed();
             embed.setColor('#9146FF');
@@ -17,7 +14,7 @@ module.exports = {
 
             let twitchData = "";
             rows.forEach((row) => {
-                twitchData += `${getStatusEmote(row.status)} ${row.twitchName}\n`;
+                twitchData += `${getStatusEmote(row.status)} ${row.twitch_name}\n`;
             });
 
             embed.setDescription(twitchData);

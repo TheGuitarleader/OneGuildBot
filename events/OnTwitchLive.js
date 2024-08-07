@@ -1,8 +1,7 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
 const request = require('request');
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
+
 const HelixAPI = require('simple-helix-api');
 const Twitch = new HelixAPI({
     access_token: config.twitch.access_token,
@@ -10,16 +9,16 @@ const Twitch = new HelixAPI({
     redirect_url: "http://localhost"
 });
 
-module.exports = function OnTwitchLive(logger, stream, client) {
+module.exports = function OnTwitchLive(logger, stream, db, client) {
+    logger.info(`User '${stream.user_name}' (${stream.user_id}) is now live.`);
+
     var guild = client.guilds.cache.get(config.discord.guildID);
-    db.get(`SELECT * FROM twitchAccounts WHERE twitchID = ?`, [stream.user_id], (err, user) => {
-        if(err) {
-            logger.error(err);
+    guild.members.fetch(db.user_id).then((member) => {
+        if(member.roles.cache.find(r => r.id === "1114462293208612926")) {
+            displayLiveInfo(logger, stream, member, client.channels.cache.get(db.channel_id), client);
         }
-        else {
-            guild.members.fetch(user.discordID).then((member) => {
-                displayLiveInfo(logger, stream, member, client.channels.cache.get(user.channelID), client);
-            });
+        else if(config.debugMode) {
+            logger.info(`Skipping '${stream.user_name}' (${stream.user_id}) as they do not have a high enough score.`);
         }
     });
 }
@@ -34,7 +33,7 @@ function displayLiveInfo(logger, stream, member, channel, client) {
         embed.setImage(user.profile_image_url)
 
         if(stream.game_name != null && stream.game_name != undefined) {
-            embed.addField('Game', stream.game_name, true)
+            embed.addField('Game', stream.game_name.toString(), true)
         }
 
         if(member.roles.cache.find(r => r.name === "Guild Leaders") || member.roles.cache.find(r => r.name === "Guild Members") || member.roles.cache.find(r => r.name === "Guild Managers")) {
@@ -61,7 +60,12 @@ function displayLiveInfo(logger, stream, member, channel, client) {
         logger.info(`Forwarding live update from '${stream.user_login}' (${stream.user_id}) to '${channel.name}' (${channel.id}) ->`);
 
         if(member.roles.cache.find(r => r.id === "1033113741358796951")) {
-
+            client.channels.fetch(config.discord.gen_ch).then(chnl => {
+                chnl.send({
+                    content: `Please go catch ${member.displayName}'s stream over on Twitch! They're in our Creator Spotlight!`,
+                    embeds: [ embed ]
+                });  
+            });          
         }
     });
 };
@@ -85,7 +89,7 @@ function createGuildEvent(logger, name, stream, client) {
             location: `https://twitch.tv/${stream.user_login}`
         }
     }).then((guildEvent) => {
-        db.run(`UPDATE twitchAccounts SET eventID = "${guildEvent.id}" WHERE twitchID = "${stream.user_id}"`, function(err) {
+        client.db.run(`UPDATE twitchAccounts SET eventID = "${guildEvent.id}" WHERE twitchID = "${stream.user_id}"`, function(err) {
             if(err) {
                 logger.error(err);
             }

@@ -21,6 +21,8 @@ module.exports = {
                     logger.error(err);
                 }
 
+                client.db.ping()
+
                 var botping = Math.round(interaction.client.ws.ping);
                 var ping = intr.createdTimestamp - interaction.createdTimestamp;
     

@@ -1,9 +1,6 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-
 const Twit = require('twit');
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
 
 var Twitter = new Twit({
     consumer_key: config.twitter.consumer_key,

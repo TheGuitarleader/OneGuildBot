@@ -1,24 +1,24 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
 const request = require('request');
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
 
 const OnTwitchLive = require('../events/OnTwitchLive.js');
 
 module.exports = function(logger, client, time) {
-    getUsers().then((users) => {
+    getUsers(client).then((users) => {
+        //console.log(users);
+
         if(users.length > 0 && users != undefined) {
             var format = `https://api.twitch.tv/helix/streams?`;
             users.forEach((user) => {
-                format += `user_id=${user}&`
+                format += `user_id=${user.twitch_id}&`
             });
         
             var url = format.slice(0, -1);
             let newTime = time.getTime() + 14400000;
 
             if(config.debugMode == true) {
-                logger.info(`Sending request -> ${url}`);
+                logger.info(`Sending api request ->`);
             }
         
             request.get(url, {
@@ -33,7 +33,7 @@ module.exports = function(logger, client, time) {
                     var data = JSON.parse(body);
                     let streams = data.data;
 
-                    if(config.debugMode == true) {
+                    if(config.debugMode) {
                         console.log({
                             data: data,
                             streams: streams,
@@ -49,40 +49,43 @@ module.exports = function(logger, client, time) {
                     client.guilds.fetch(config.discord.guildID).then((guild) => {
                         streams.forEach((stream) => {
                             
-                            if(config.debugMode == true) {
-                                console.log(stream);
+                            if(config.debugMode) {
+                                //console.log(stream);
                             }
 
-                            db.get(`SELECT * FROM twitchAccounts WHERE twitchID = "${stream.user_id}"`, (err, row) => {
+                            client.db.query(`SELECT twitch_id as dummy, twitch_id, twitch_name, channel_id, cooldown, event_id, status, (SELECT user_id FROM members WHERE members.twitch_id = dummy) as user_id FROM twitch_users WHERE twitch_id = ${stream.user_id}`, (err, rows) => {
+                                var row = rows[0];
+
+                                //console.log(row);
+
+                                if(config.debugMode) {
+                                    logger.debug(`${row.status} == offline && ${time.getTime()} >= ${row.cooldown}`);
+                                }
+
                                 if(err) {
                                     logger.error(err);
                                 }
                                 else if(row.status == "offline" && time.getTime() >= row.cooldown) {
-                                    console.log(time.getTime());
-                                    console.log(row.cooldown);
-
-                                    guild.members.fetch(row.discordID).then((member) => {
-                                        db.run(`UPDATE twitchAccounts SET twitchName = "${stream.user_name}", discordName = "${member.displayName}", status = "online", cooldown = "${newTime}" WHERE twitchID = "${stream.user_id}"`, function(err) {
-                                            if(err) {
-                                                logger.error(err);
-                                            }
-                                            else {
-                                                // Forward live notifications
-                                                logger.info(`User '${stream.user_name}' (${stream.user_id}) is now live.`);
-                                                OnTwitchLive(logger, stream, client);
-                                            }
-                                        });
+                                    client.db.query(`UPDATE twitch_users SET twitch_name = "${stream.user_name}", status = "online", cooldown = ${newTime} WHERE twitch_id = "${stream.user_id}"`, function(err) {
+                                        if(err) {
+                                            logger.error(err);
+                                        }
+                                        else {
+                                            // Forward live notifications        
+                                            OnTwitchLive(logger, stream, row, client);
+                                        }
                                     });
                                 }
                                 else if(row.status == "online") {
-                                    findOfflineStreams(logger, stream_ids, client);
-                                    if(row.eventID != null) {
-                                        guild.scheduledEvents.fetch(row.eventID).then((guildEvent) => {
+                                    findOfflineStreams(logger, stream_ids, client)
+
+                                    if(row.event_id != null) {
+                                        guild.scheduledEvents.fetch(row.event_id).then((guildEvent) => {
                                             if(time.getTime() < guildEvent.scheduledEndTimestamp) {
                                                 //console.log(guildEvent);
                                                 guildEvent.edit({
                                                     name: formatStreamName(stream.title),
-                                                    scheduledEndTimestamp: time.getTime() + 120000
+                                                    scheduledEndTimestamp: time.getTime() + 130000
                                                 });
                                             }
                                         });
@@ -108,72 +111,67 @@ module.exports = function(logger, client, time) {
     });
 };
 
-const getUsers = () => {
+const getUsers = (client) => {
     return new Promise((res, rej) => {
-        let result = [];
-        db.each(`SELECT * FROM twitchAccounts`, (err, row) => {
+        client.db.query(`SELECT * FROM twitch_users`, (err, rows) => {
             if(err) {
                 rej(err)
             }
-            result.push(row.twitchID);
-        }, () => {
-            res(result);
-        })
+
+            res(rows);
+        });
     })
 };
 
-const getOnlineUsers = () => {
+const getOnlineUsers = (client) => {
     return new Promise((res, rej) => {
-        let result = [];
-        db.each(`SELECT * FROM twitchAccounts WHERE status = "online"`, (err, row) => {
+        client.db.query(`SELECT twitch_id FROM twitch_users WHERE status = "online"`, (err, rows) => {
             if(err) {
                 rej(err)
             }
-            result.push(row.twitchID);
-        }, () => {
-            res(result);
-        })
+
+            res(rows);
+        });
     })
 };
 
 
 function findOfflineStreams(logger, streamsArray, client) {
-    getOnlineUsers().then((userArray) => {
+    getOnlineUsers(client).then((userArray) => {
+
         var userArraySize = userArray.length;
 
-        if(config.debugMode == true) {
+        if(config.debugMode) {
             logger.info(`Users online -> ${userArray.length}`);
         }
  
         for(var i = 0; i < userArraySize; i++) {
-           if (streamsArray.indexOf(userArray[i]) == -1) {
-               db.serialize(() => {
-                   db.get(`SELECT * FROM twitchAccounts WHERE twitchID = "${userArray[i]}"`, (err, row) => {
-                       logger.info(`User ${row.twitchName} is now offline`);
-                       if(row.eventID != null) {
-                           client.guilds.fetch(config.discord.guildID).then((guild) => {
-                               guild.scheduledEvents.fetch(row.eventID).then((guildEvent) => {
-                                   guildEvent.delete();
-                               })
-                           });
+            if (streamsArray.indexOf(userArray[i].twitch_id) == -1) {
+                client.db.query(`SELECT * FROM twitch_users WHERE twitch_id = "${userArray[i].twitch_id}"`, (err, row) => {
+                    logger.info(`User ${row.twitchName} is now offline`);
+                    if(row.event_id != null) {
+                        client.guilds.fetch(config.discord.guildID).then((guild) => {
+                            guild.scheduledEvents.fetch(row.event_id).then((guildEvent) => {
+                                guildEvent.delete();
 
-                            if(config.debugMode == true) {
-                                console.log(row);
-                            }
-                       }
-                   });
-                
-                   db.run(`UPDATE twitchAccounts SET status = "offline", eventID = null WHERE twitchID = "${userArray[i]}"`, function(err) {
-                       if(err) {
-                           logger.error(err);
-                       }
+                                if(config.debugMode) {
+                                    logger.debug(`Deleted guild event '${guildEvent.name}' (${guildEvent.id})`);
+                                }
+                            })
+                        });
+                    }
+                });
+             
+                client.db.query(`UPDATE twitch_users SET status = "offline", event_id = null WHERE twitch_id = "${userArray[i].twitch_id}"`, function(err) {
+                    if(err) {
+                        logger.error(err);
+                    }
 
-                       if(config.debugMode == true) {
-                        logger.info(`Setting user to offline -> ${userArray[i]}`);
-                       }
-                   }); 
-               });
-           }
+                    if(config.debugMode) {
+                        logger.debug(`Setting user to offline -> ${userArray[i].twitch_id}`);
+                    }
+                });    
+            }
         }
     });
 }

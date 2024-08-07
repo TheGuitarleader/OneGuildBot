@@ -1,4 +1,6 @@
+const host = require('../config.json').mysql;
 const {Client, Collection, Intents} = require('discord.js');
+const mysql = require('mysql');
 
 module.exports = class extends Client {
   constructor(config) {
@@ -7,8 +9,17 @@ module.exports = class extends Client {
       partials: ['GUILD_MEMBER']
     });
 
-    this.commands = new Collection();
+    this.db = mysql.createConnection({
+      host: host.host,
+      user: host.user,
+      password: host.password,
+      database: host.database,
+      charset: "utf8mb4",
+      supportBigNumbers: true,
+      bigNumberStrings: true
+    });
 
+    this.commands = new Collection();
     this.config = config;
   }
 };

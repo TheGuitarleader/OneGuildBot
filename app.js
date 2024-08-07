@@ -8,10 +8,9 @@ const clock = require('date-events')();
 const moment = require('moment');
 const HelixAPI = require('simple-helix-api');
 const request = require('request');
+const process = require('process');
 
 // Functions
-const vip = require('./functions/vipProgress.js');
-const addToVips = require('./functions/addToVips.js');
 const checkTwitchUsers = require('./functions/checkTwitchUsers.js');
 
 // Events
@@ -19,13 +18,13 @@ const OnMemberJoin = require('./events/OnMemberJoin');
 const OnMemberLeave = require('./events/OnMemberLeave');
 const OnNewTweet = require('./events/OnNewTweet');
 const OnNewInteraction = require('./events/OnInteraction');
+const OnMessage = require('./events/OnMessage');
+const OnDeleteMessage = require('./events/OnDeleteMessage');
+const OnEditMessage = require('./events/OnEditMessage');
 
 const discordClient = new Client();
 discordClient.commands = new Discord.Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
 
 for(const file of commandFiles) {
     const command = require(`./commands/${file}`);
@@ -35,11 +34,10 @@ for(const file of commandFiles) {
 //
 // Logging
 //
-const KaiLogs = require('kailogs');
-const logger = new KaiLogs.logger('./logs');
-new KaiLogs.exceptions(logger).handle();
-new KaiLogs.rejections(logger).handle();
-logger.info(`${package.name} v${package.version}`);
+const Margo = require('margojs');
+const logger = new Margo.logger('./', config.logging, package);
+new Margo.exceptions(logger).handle();
+new Margo.rejections(logger).handle();
 
 logger.on('error', function(err) {
     setTimeout(_gracefulExit, 2000);
@@ -59,7 +57,7 @@ clock.on('23:59', () => {
 if(config.debugMode) {
     logger.debug('---STARTING IN DEBUG MODE!---');
     discordClient.on('debug', debug => {
-        logger.log(debug, 'DEBUG', 'discord');
+        logger.log(debug, 'DEBUG', 'discordClient');
     });
 }
 
@@ -76,16 +74,35 @@ discordClient.on('warn', warn => {
 //
 discordClient.login(config.discord.token);
 
+const discordWebhook = new Discord.WebhookClient({
+    id: config.discord.appID,
+    token: config.discord.token
+})
+
 discordClient.once('disconnect', () => {
 	logger.warn('Disconnected from Discord');
 });
 
 discordClient.once('ready', () => {
+    process.send('ready');
     logger.info('Online and connected to Discord');
     discordClient.guilds.fetch(config.discord.guildID).then((g) => {
         g.commands.set(discordClient.commands);
         logger.info(`Updated slash commands for guild: '${g.name}' (${g.id})`);
     });
+
+    // let channels = discordClient.channels.cache;
+    // for (const channel of channels.values())
+    // {
+    //     discordClient.db.query(`UPDATE all_messages SET channel_id = ${channel.id} WHERE channel_name = "${channel.name}";`, (err) => {
+    //         if(err) {
+    //             console.error(err);
+    //         }
+    //         else {
+    //             console.log(`UPDATE all_messages SET channel_id = ${channel.id} WHERE channel_name = "${channel.name}";`);
+    //         }
+    //     });
+    // }
 
     if(config.debugMode) {
         discordClient.user.setPresence({ activities: [{ name: `v${package.version}`, type:'WATCHING' }], status: 'dnd' });
@@ -93,21 +110,48 @@ discordClient.once('ready', () => {
     }
 });
 
+// Webhook Updates
+if(config.debugMode || true) {
+    console.debug(`Webhook URL: ${discordWebhook.url}`);
+
+    discordWebhook.once('debug', debug => {
+        logger.log(debug, 'DEBUG', 'discordWebhook');
+    })
+}
+
+discordWebhook.on('apiRequest', request => {
+    console.log(request);
+})
+
+discordWebhook.once('apiResponse', response => {
+    console.log(response);
+})
 
 // Handle messages
+let ignoredChannels = [ '799134128091299892', '895103944341209108', '963843942766501948', '995114322600669205' ];
+
 discordClient.on('messageCreate', async message => {
     if(message.author.bot) return;
     if(message.content.startsWith(config.discord.botPrefix)) return;
+    if(ignoredChannels.includes(message.channel.id)) return;
 
     if(message.guild.id == config.discord.guildID) {
-        logger.message(message.channel.name, message.author.username, message.content.replace(/(?:\r\n|\r|\n)/g, " "));
-        vip(logger, message, 1);
+        OnMessage(logger, message, discordClient);
     }
 });
 
 discordClient.on('messageUpdate', (oldMessage, newMessage) => {
+    if(ignoredChannels.includes(newMessage.channel.id)) return;
     if(oldMessage.content == newMessage.content) return;
-    logger.message(newMessage.channel.name, newMessage.author.username, "{EDITED} " + newMessage.content.replace(/(?:\r\n|\r|\n)/g, " "));
+    OnEditMessage(logger, oldMessage, newMessage, discordClient);
+});
+
+discordClient.on('messageDelete', message => {
+    if(message.author.bot) return;
+    if(message.content.startsWith(config.discord.botPrefix)) return;
+    if(ignoredChannels.includes(message.channel.id)) return;
+
+    OnDeleteMessage(logger, message, discordClient);
 });
 
 
@@ -124,7 +168,7 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
             discordClient.channels.fetch(config.discord.vip_ch).then((channel) => {
                 if(!newMember.roles.cache.find(r => r.name === "Guild Leaders") && !newMember.roles.cache.find(r => r.name === "Guild Managers") && !newMember.roles.cache.find(r => r.name === "Guild Members"))
                 {
-                    db.get(`SELECT * FROM users WHERE discordID = "${newMember.user.id}" AND isVIP = "false"`, [], (err, row) => {
+                    sqliteDB.get(`SELECT * FROM users WHERE discordID = "${newMember.user.id}" AND isVIP = "false"`, [], (err, row) => {
                         if(err) {
                             logger.error(err);
                         }
@@ -148,7 +192,7 @@ discordClient.on("guildMemberUpdate", (oldMember, newMember) => {
         //     Twitch.users.getByLogin(newMember.user.username).then((user) => {
         //         logger.info(`Searching Twitch for: '${user.display_name}'`);
         //         if(user != undefined && user.id != undefined && user.display_name != null) {
-        //             db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online", 0, null)`, (err) => {
+        //             sqliteDB.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${config.discord.live_ch}", "${newMember.user.id}", "${newMember.user.username}", "online", 0, null)`, (err) => {
         //                 if(err){
         //                     logger.warn(err);
         //                 }
@@ -185,8 +229,8 @@ clock.on('*-*-* 00:00', function (rawDate) {
 
     logger.info(`Checking VIPs for today`);
     discordClient.guilds.fetch(config.discord.guildID).then((guild) => {
-        db.serialize(() => {
-            db.all(`SELECT * FROM vips WHERE expireDate = "${date}"`, (err, rows) => {
+        sqliteDB.serialize(() => {
+            sqliteDB.all(`SELECT * FROM vips WHERE expireDate = "${date}"`, (err, rows) => {
                 if(err){
                     logger.error(err);
                 }
@@ -196,8 +240,8 @@ clock.on('*-*-* 00:00', function (rawDate) {
                         guild.members.fetch(row.discordID).then((member) => {
                             member.roles.remove(member.guild.roles.cache.find(r => r.name === "VIP"));
     
-                            db.serialize(() => {
-                                db.run(`DELETE FROM vips WHERE expireDate = "${date}"`, function(err) {
+                            sqliteDB.serialize(() => {
+                                sqliteDB.run(`DELETE FROM vips WHERE expireDate = "${date}"`, function(err) {
                                     if(err) {
                                         logger.error(err);
                                     }
@@ -206,7 +250,7 @@ clock.on('*-*-* 00:00', function (rawDate) {
                                     }
                                 });
     
-                                db.run(`UPDATE users SET vipProgress = 0, isVIP = "false" WHERE discordID = "${member.user.id}"`, function(err) {
+                                sqliteDB.run(`UPDATE users SET vipProgress = 0, isVIP = "false" WHERE discordID = "${member.user.id}"`, function(err) {
                                     if(err) {
                                         logger.error(err);
                                     }
@@ -220,7 +264,7 @@ clock.on('*-*-* 00:00', function (rawDate) {
                 }
             });
 
-            db.all(`SELECT * FROM channels ORDER BY daily DESC`, (err, rows) => {
+            sqliteDB.all(`SELECT * FROM channels ORDER BY daily DESC`, (err, rows) => {
                 let dailyMessages = 0;
                 let dailyString = "";
         
@@ -228,13 +272,19 @@ clock.on('*-*-* 00:00', function (rawDate) {
                     rows.forEach(row => {
                         if(row.daily > 0) {
                             dailyMessages = dailyMessages + parseInt(row.daily);
-                            dailyString += `${row.name}: ${formatCommas(row.daily)}\n`
+                            dailyString += `${row.name}: ${formatCommas(row.daily)}\n`;
+
+                            sqliteDB.run(`INSERT OR IGNORE INTO dailyCounts VALUES("${FormatDate(Date.now())}", "${row.id}", "${row.name}", ${row.daily})`, (err) => {
+                                if(err) {
+                                    logger.warn(err);
+                                }
+                            });
                         }
                     });
         
                     const embed = new Discord.MessageEmbed()
                     .setColor(config.discord.embedHex)
-                    .setTitle(`Counts for ${FormatDate(Date.now())}`)
+                    .setTitle(`Counts for ${GetYesterday()}`)
                     .setDescription(`**${dailyString}\nTotal today: ${formatCommas(dailyMessages)}**`)
                     .setFooter({ text: guild.name, iconURL: guild.iconURL() });
         
@@ -244,7 +294,7 @@ clock.on('*-*-* 00:00', function (rawDate) {
                 }
             });
 
-            db.run(`UPDATE channels SET daily = 0`, function(err) {
+            sqliteDB.run(`UPDATE channels SET daily = 0`, function(err) {
                 if(err) {
                     logger.warn(err);
                 }
@@ -259,14 +309,15 @@ clock.on('*-*-* 00:00', function (rawDate) {
 clock.on('*-*-01 00:00', function (rawDate) {
     let messages = [];
     let month = GetMonth(-1);
+    let year = new Date(Date.now()).getFullYear();
     let vipAmount = 0;
     
-    db.serialize(() => {
-        db.all(`SELECT * FROM users WHERE vipProgress >= 8`, (err, rows) => {
+    sqliteDB.serialize(() => {
+        sqliteDB.all(`SELECT * FROM users WHERE vipProgress >= 8`, (err, rows) => {
             rows.forEach((row) => {
                 console.log(row);
                 messages.push(row.vipProgress);
-                db.run(`INSERT INTO messageHistory VALUES("${month}", "${row.discordID}", "${row.username}", "${row.vipProgress}", "${row.totalMessages}")`, function(err) {
+                sqliteDB.run(`INSERT INTO messageHistory VALUES("${month} ${year}", "${row.discordID}", "${row.username}", "${row.vipProgress}", "${row.totalMessages}")`, function(err) {
                     if(err) {
                         logger.warn(err);
                     }
@@ -279,21 +330,12 @@ clock.on('*-*-01 00:00', function (rawDate) {
 
             vipAmount = findAverage(messages);
             console.log(vipAmount);
-            db.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount}`, function(err) {
+            sqliteDB.run(`UPDATE users SET vipProgress = 0, toVIP = ${vipAmount}`, function(err) {
                 if(err) {
                     logger.warn(err);
                 }
                 else {
                     logger.info(`Reset all users VIP progress`);
-                }
-            });
-
-            db.run(`UPDATE channels SET monthly = 0`, function(err) {
-                if(err) {
-                    logger.warn(err);
-                }
-                else {
-                    logger.info(`Reset all channels monthly count.`);
                 }
             });
         });
@@ -317,10 +359,16 @@ function formatCommas(number) {
 function FormatDate(date)
 {
     var d = new Date(date);
-    var month = d.getMonth() + 1;
-    var day = d.getDate();
+    var month = ('0' + (d.getMonth() + 1)).slice(-2);
+    var day = ('0' + d.getDate()).slice(-2);
     var year = d.getFullYear();
     return year + '-' + month + '-' + day;
+}
+
+function GetYesterday()
+{
+    var yesterday = moment().subtract(1, 'days');
+    return yesterday.format('MMMM D, YYYY');
 }
 
 function GetMonth(offset) {
@@ -339,7 +387,7 @@ function GetMonth(offset) {
 
     console.log(index);
 
-    return `${months[index]} ${d.getFullYear()}`;
+    return `${months[index]}`;
 }
 
 // function GetTime()
@@ -368,7 +416,7 @@ var Twitter = new Twit({
 const getTwitterUsers = () => {
     return new Promise((res, rej) => {
         let result = [];
-        db.each(`SELECT ID FROM tweetAccounts`, (err, row) => {
+        sqliteDB.each(`SELECT ID FROM tweetAccounts`, (err, row) => {
             if(err) {
                 rej(err)
             }
@@ -379,35 +427,38 @@ const getTwitterUsers = () => {
     })
 };
 
-getTwitterUsers().then((users) => {
-    logger.info('Gathered users from database');
-    var tweetStream = Twitter.stream('statuses/filter', { follow: users });
+// getTwitterUsers().then((users) => {
+//     logger.info('Gathered users from database');
+//     var tweetStream = Twitter.stream('statuses/filter', { follow: users });
 
-    tweetStream.on('disconnected', function(disconnect) {
-        logger.warn('Disconnected from follow tweet stream');
-    });
+//     tweetStream.on('disconnected', function(disconnect) {
+//         logger.warn('Disconnected from follow tweet stream');
+//     });
 
-    tweetStream.on('connect', function (request) {
-        logger.info('Connecting to follow tweetStream...');
-    });
+//     tweetStream.on('connect', function (request) {
+//         logger.info('Connecting to follow tweetStream...');
+//         if(config.debugMode) {
+//             logger.debug(tweetStream.);
+//         }
+//     });
 
-    tweetStream.on('connected', function (response) {
-        logger.info(`Connected to tweetStream with message: '${response.statusMessage}' (Code: ${response.statusCode})`);
-    });
+//     tweetStream.on('connected', function (response) {
+//         logger.info(`Connected to tweetStream with message: '${response.statusMessage}' (Code: ${response.statusCode})`);
+//     });
 
-    tweetStream.on('tweet', function(tweet) {
-        OnNewTweet(logger, tweet, discordClient, db, users);
-    });
+//     tweetStream.on('tweet', function(tweet) {
+//         OnNewTweet(logger, tweet, discordClient, sqliteDB, users);
+//     });
 
-    clock.on('hour', function (date) {
-        if(config.debugMode) {
-            logger.debug("Refreshing tweet stream...");
-        }
+//     clock.on('hour', function (date) {
+//         if(config.debugMode) {
+//             logger.debug("Refreshing tweet stream...");
+//         }
 
-        tweetStream.stop();
-        tweetStream.start();
-    });
-});
+//         tweetStream.stop();
+//         tweetStream.start();
+//     });
+// });
 
 //
 // Twitch API
@@ -420,15 +471,17 @@ const Twitch = new HelixAPI({
 });
 
 function getTwitchToken() {
-    request.post(`https://id.twitch.tv/oauth2/token?client_id=${config.twitch.client_id}&client_secret=${config.twitch.client_secret}&grant_type=client_credentials`, (err, res, body) => {
-        if (!err && res.statusCode == 200) {
-            var data = JSON.parse(body);
-            console.log(data);
-            return data.data.access_token;
-        }
-        else {
-            logger.info(`Error: '${err}' with message: '${res.statusMessage}' (Code: ${res.statusCode})`, 'getTwitchToken');
-        }
+    return new Promise((res, rej) => {
+        request.post(`https://id.twitch.tv/oauth2/token?client_id=${config.twitch.client_id}&client_secret=${config.twitch.client_secret}&grant_type=client_credentials`, (err, response, body) => {
+            if (!err && response.statusCode == 200) {
+                var data = JSON.parse(body);
+                res(data);
+            }
+            else {
+                logger.info(`Error: '${err}' with message: '${response.statusMessage}' (Code: ${response.statusCode})`, 'getTwitchToken');
+                rej(null);
+            }
+        });
     });
 }
 
@@ -438,5 +491,29 @@ clock.on('*:*', function(rawTime) {
     if(config.debugMode) {
         console.log(rawTime);
         logger.info("Requesting Twitch info...");
+    }
+
+    // Check if token is valid
+    var expiresIn = new Date(config.twitch.expires_in).getTime();
+    var currentTime = Date.now();
+
+    if(currentTime > expiresIn) {
+        console.log('Generating new token...');
+
+        getTwitchToken().then(token => {
+            config.twitch.access_token = token.access_token;
+            config.twitch.expires_in = (Date.now() + (token.expires_in * 1000));
+
+            fs.writeFile('./config.json', JSON.stringify(config, null, 2), function writeJSON(err) {
+                if (err) return logger.error(err);
+                logger.info(`Updated access token. Time extended from '${FormatDate(expiresIn)}' -> '${FormatDate(new Date(config.twitch.expires_in).getTime())}'`);
+                discordClient.users.fetch('190612480958005248').then(user => {
+                    user.send(`Updated access token. Time extended from '${FormatDate(expiresIn)}' -> '${FormatDate(new Date(config.twitch.expires_in).getTime())}'`);
+                });
+            });
+    
+            setTimeout(_gracefulExit, 2000);
+            logger.info('Restarting bot with new token...');
+        });
     }
 });

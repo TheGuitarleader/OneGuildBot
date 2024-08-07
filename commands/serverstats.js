@@ -1,33 +1,26 @@
 const Discord = require('discord.js');
-const KaiLogs = require('kailogs');
+const Margo = require('margojs');
 const config = require('../config.json');
 
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
-
 module.exports = {
-    name: "stats",
-    description: "Server statistics",
+    name: "counts",
+    description: "Message counts",
     options: [
         {
-          name: 'type',
-          type: 3,
-          description: 'The type of action',
-          required: true,
-          choices: [
-            {
-                name: 'Message Stats',
-                value: 'message'
-            },
-            {
-                name: 'Channel Stats',
-                value: 'channel'
-            }
-          ]
+          name: 'days',
+          type: 4,
+          description: 'How many days from today',
+          required: true
         }
     ],
+
+    // 3 - String
+    // 4 - Int
+    // 5 - Bool
+    // 6 - Discord User
+
     /**
-     * @param {KaiLogs.Logger} logger 
+     * @param {Margo.Logger} logger 
      * @param {Discord.Interaction} interaction 
      * @param {Discord.Client} client 
      */
@@ -90,12 +83,12 @@ module.exports = {
                     }
                 });
             }
-            else if((type == 'channel')) {
-                interaction.reply({
-                    content: "**Feature still in development!**",
-                    ephemeral: true
-                });
-            }
+        }
+        else {
+            interaction.reply({
+                content: ":no_entry_sign: **Unauthorized**",
+                ephemeral: true
+            });
         }
     }
 }

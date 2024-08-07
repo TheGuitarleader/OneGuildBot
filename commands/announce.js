@@ -1,5 +1,5 @@
 const Discord = require('discord.js');
-const KaiLogs = require('kailogs');
+const Margo = require('margojs');
 const config = require('../config.json');
 
 module.exports = {
@@ -10,7 +10,6 @@ module.exports = {
           name: 'message',
           type: 3,
           description: 'The message to send in the embed',
-          required: true,
         },
         {
             name: 'title',
@@ -37,10 +36,13 @@ module.exports = {
         if(config.discord.ownerIDs.includes(interaction.member.id)) {
             const embed = new Discord.MessageEmbed()
             embed.setColor(getColor());
-            embed.setDescription(interaction.options.get('message').value);
 
             if(interaction.options.get('title') != null && interaction.options.get('title') != undefined) {
                 embed.setTitle(interaction.options.get('title').value);
+            }
+
+            if(interaction.options.get('message') != null && interaction.options.get('message') != undefined) {
+                embed.setDescription(interaction.options.get('message').value);
             }
 
             if(interaction.options.get('author') != null && interaction.options.get('author') != undefined) {

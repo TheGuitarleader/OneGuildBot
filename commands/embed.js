@@ -1,5 +1,5 @@
 const Discord = require('discord.js');
-const KaiLogs = require('kailogs');
+const Margo = require('margojs');
 const config = require('../config.json');
 
 module.exports = {

@@ -1,21 +1,23 @@
 {
   "dependencies": {
+    "chartjs-node-canvas": "^4.1.6",
     "date-events": "^1.0.1",
-    "discord.js": "^13.5.0",
-    "kailogs": "^4.1.2",
+    "discord.js": "^13.15.1",
+    "margojs": "^1.0.1",
     "moment": "^2.29.1",
+    "mysql": "^2.18.1",
     "request": "^2.88.2",
-    "request-promise": "^4.2.6",
     "simple-helix-api": "^2.1.2",
-    "sqlite3": "^4.2.0",
     "twit": "^2.2.11"
   },
   "name": "onesiebot",
-  "version": "0.10.0",
+  "displayName": "OneGuild Bot",
+  "version": "1.0.0-Beta.1",
   "description": "a discord bot",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js",
+    "start-backup": "node logging.js"
   },
   "author": "Kyle (TheGuitarleader)",
   "license": "ISC"

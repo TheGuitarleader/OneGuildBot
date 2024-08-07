@@ -1,9 +1,6 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
-
 const HelixAPI = require('simple-helix-api');
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
 
 const Twitch = new HelixAPI({
     access_token: config.twitch.access_token,
@@ -55,36 +52,34 @@ module.exports = {
             if(type == 'add') {
                 await Twitch.users.getByLogin(interaction.options.get('twitch_name').value).then((user) => {
                     if(user != undefined && user.id != undefined && user.display_name != undefined) {
-                        db.serialize(() => {
-                            db.run(`INSERT INTO twitchAccounts VALUES("${user.id}", "${user.display_name}", "${getChannelID(interaction.options.getChannel('channel'))}", "${interaction.options.getUser('user').id}", "${interaction.options.getUser('user').username}", "online", 0, null)`, (err) => {
-                                if(err){
-                                    logger.warn(err);
-                                    interaction.reply({
-                                        content: ':x: `' + user.display_name + '`** is already being followed!** ```' + err + '```',
-                                        ephemeral: true
-                                    });
-                                }
-                                else
-                                {
-                                    logger.info(`Followed new account '${user.display_name}' (${user.id})`);
-    
-                                    const embed = new Discord.MessageEmbed()
-                                    .setColor("9146FF")
-                                    .setAuthor({ name: user.display_name, iconURL: user.profile_image_url, url: `https://twitch.tv/${user.login}` })
-                                    .setDescription(user.description)
-                                    .setImage(user.offline_image_url)
-                                    .addField("Type", "`" + user.broadcaster_type + "`", true)
-                                    .addField("Views", formatCommas(user.view_count), true)
-                                    .setFooter({ text: 'Powered By Quentin' })
-      
-                                    interaction.reply({
-                                        content: ':white_check_mark: **Successfully started following `' + user.display_name + '`.** ',
-                                        embeds: [ embed ],
-                                        ephemeral: true
-                                    });
-                                }
-                            });
-                        })
+                        db.run(`INSERT INTO twitch_users VALUES("${user.id}", "${user.display_name}", "${getChannelID(interaction.options.getChannel('channel'))}", "${interaction.options.getUser('user').id}", "${interaction.options.getUser('user').username}", "online", 0, null)`, (err) => {
+                            if(err){
+                                logger.warn(err);
+                                interaction.reply({
+                                    content: ':x: `' + user.display_name + '`** is already being followed!** ```' + err + '```',
+                                    ephemeral: true
+                                });
+                            }
+                            else
+                            {
+                                logger.info(`Followed new account '${user.display_name}' (${user.id})`);
+
+                                const embed = new Discord.MessageEmbed()
+                                .setColor("9146FF")
+                                .setAuthor({ name: user.display_name, iconURL: user.profile_image_url, url: `https://twitch.tv/${user.login}` })
+                                .setDescription(user.description)
+                                .setImage(user.offline_image_url)
+                                .addField("Type", "`" + user.broadcaster_type + "`", true)
+                                .addField("Views", formatCommas(user.view_count), true)
+                                .setFooter({ text: 'Powered By Quentin' })
+  
+                                interaction.reply({
+                                    content: ':white_check_mark: **Successfully started following `' + user.display_name + '`.** ',
+                                    embeds: [ embed ],
+                                    ephemeral: true
+                                });
+                            }
+                        });
                     }
                     else {
                         logger.warn(`No results for search: '${interaction.options.get('twitch_name').value}'`);

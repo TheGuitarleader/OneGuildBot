@@ -1,9 +1,6 @@
 const Discord = require('discord.js');
 const config = require('../config.json');
 
-const sqlite = require('sqlite3').verbose();
-let db = new sqlite.Database('./data.db');
-
 module.exports = {
     name: "twitch-list",
     description: "Lists the followed Twitch accounts",
